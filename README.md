@@ -1,3 +1,8 @@
+
 # GeneralizationPredictionCovariateShift
-A new method for predicting generalization under covariate shifts.
-NOTE TO REVIEWERS: Working on making a pretty repo, but requires heavy refactoring. Will try to have it ready ASAP
+## Note to reviewers: refactoring in progress; this project is derived from a larger, long term project such that there are many obsolete codepaths, debugging statements, and prototyping parameter changes. We apologize for any difficulty in navigating/understanding the code. 
+
+Deep vision models often experience accuracy degradation under covariate shift. This raises challenges for reliability and trustworthiness, as deployment streams typically lack labels to measure this degradation. We study whether aggregate out-of-distribution (OOD) detection rates can serve as sequence-level indicators of network accuracy under shift. Across five benchmarks, multiple architectures, six post-hoc OOD detectors, synthetic perturbations, and naturally occurring domain shifts, we observe that detection rates frequently correlate with generalization gaps. We exploit this relationship by fitting a simple linear model that maps OOD detection rates to accuracy degradation using labeled synthetic shifts. At inference time, the estimator requires only unlabeled inputs. Under a leave-one-shift-out cross-validation protocol, it achieves mean absolute errors between 0.02 and 0.10 and outperforms competing methods for unlabeled accuracy estimation both in terms of absolute error and calibration across synthetic and naturally occurring shifts. These results indicate that OOD detectors can provide useful signals for monitoring model performance under covariate shift, with the caveat that their effectiveness depends on the reliability of the observed alignment between detectability and accuracy degradation.
+
+# Reproducing results
+## TODO
