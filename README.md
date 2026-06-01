@@ -1,7 +1,5 @@
 # GeneralizationPredictionCovariateShift
 
-> **Note to reviewers:** refactoring in progress; this project is derived from a larger, long-term codebase, so there are obsolete code paths, debugging statements, and prototyping parameter changes still in the tree. See the *Obsolete / known-broken code* section at the bottom for the list we are aware of.
-
 Deep vision models often experience accuracy degradation under covariate shift. This raises challenges for reliability and trustworthiness, as deployment streams typically lack labels to measure this degradation. We study whether aggregate out-of-distribution (OOD) detection rates can serve as sequence-level indicators of network accuracy under shift. Across five benchmarks, multiple architectures, six post-hoc OOD detectors, synthetic perturbations, and naturally occurring domain shifts, we observe that detection rates frequently correlate with generalization gaps. We exploit this relationship by fitting a simple linear model that maps OOD detection rates to accuracy degradation using labeled synthetic shifts. At inference time, the estimator requires only unlabeled inputs. Under a leave-one-shift-out cross-validation protocol, it achieves mean absolute errors between 0.02 and 0.10 and outperforms competing methods for unlabeled accuracy estimation both in terms of absolute error and calibration across synthetic and naturally occurring shifts. These results indicate that OOD detectors can provide useful signals for monitoring model performance under covariate shift, with the caveat that their effectiveness depends on the reliability of the observed alignment between detectability and accuracy degradation.
 
 ---
@@ -36,7 +34,7 @@ A working PyTorch + PyTorch-Lightning environment is required. The main third-pa
 
 ```
 torch, torchvision, pytorch-lightning
-numpy, pandas, scipy, scikit-learn, pygam
+numpy, pandas, scipy, scikit-learn,
 matplotlib, seaborn, tqdm
 ```
 
@@ -87,7 +85,7 @@ This sweeps every `(dataset, model, shift)` cell and writes one CSV per detector
 python -c "from experiments.pra import collect_re_accuracy_estimation_data; collect_re_accuracy_estimation_data()"
 ```
 
-This runs the leave-one-synthetic-shift-type-out calibration of the `ErrorAdjustmentEstimator` PRE baseline and writes `data/<model>/pra_data/<dataset>_pre_results.csv`.
+This runs the leave-one-synthetic-shift-type-out calibration of the `ErrorAdjustmentEstimator` PRE baseline and writes `data/<model>/pra_data/<dataset>_pre_results.csv`. The cached results are for the best-performing PRA configuration in terms of detector BA. 
 
 ### 4. Run the paper experiments
 
@@ -101,4 +99,5 @@ This calls every figure/table function in `experiments/accuracy_prediction.py` a
 * `figures/shift_type_loo_rows.csv` — per-fold predictions used by the plotting routines
 * the predicted-vs-true gap grid, per-accuracy error plot, and intensity breakdown PDFs
 
----
+## Contact
+For questions, send an e-mail to (ANONYMIZED)
