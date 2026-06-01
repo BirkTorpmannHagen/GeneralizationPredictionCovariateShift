@@ -102,21 +102,3 @@ This calls every figure/table function in `experiments/accuracy_prediction.py` a
 * the predicted-vs-true gap grid, per-accuracy error plot, and intensity breakdown PDFs
 
 ---
-
-## Obsolete / known-broken code and other gotchas
-
-Things you should be aware of while navigating the repo:
-
-* **`load_data` arbitrary thresholds.** `correct_prediction` uses `loss < 0.5` for Polyp and `acc == 1` otherwise; the comment marks both as "arbitrary threshold". Worth revisiting if you change the Polyp loss.
-* **MSP on Polyp** is skipped inside `load_data` ("MSP does not work for segmentation") — be aware when reading the per-detector tables.
-* **`riskmodel.BaseEventTree`** and `components.Trace` are imported by `simulations.py` but only one simulator path uses them; large portions of `simulations.py` / `components.py` are unused by the figures actually generated in `experiments.py` and are remnants of the larger upstream project.
-* **`experiments/accuracy_prediction.py`** has functions that are not invoked from the top-level entry point (`error_heatmap`, `loo_fold_comparison`, `atc_comparison`, `shift_type_loo_predictions`, `atc_predictions`) — keep what you need, the rest can be deleted.
-
-## Missing from your reproduction list
-
-The list you gave (train models → `eval_detectors` → collect PRA → `experiments.py`) is essentially correct. Two things worth calling out explicitly:
-
-1. **Glow training is a separate stage** (`glow/trainpl.py`). The `typicality` detector reads `self.testbed.glow`, so without those checkpoints stage 2 will fail for that detector. Each testbed in `testbeds/*.py` hard-codes a specific Glow checkpoint path.
-2. **Segmentation backbones** need `segmentor/train.py` independently of `classifier/train.py` — the Polyp testbed uses DeepLabV3+ / U-Net / SegFormer, not ResNet/ViT.
-
-Beyond that: dataset paths in `testbeds/` and the four training scripts must be adjusted for your filesystem; checkpoint paths inside the testbed constructors must match whatever you produce in stage 1.
