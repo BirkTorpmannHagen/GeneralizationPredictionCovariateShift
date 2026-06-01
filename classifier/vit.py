@@ -27,7 +27,7 @@ from torchmetrics import Accuracy
 class ViTClassifier(Classifier):
     def __init__(self, num_classes,
                  optimizer='adam', lr=1e-6, batch_size=16,
-                 transfer=True, img_shape=224):
+                 img_shape=224):
         super().__init__(num_classes, optimizer, lr, batch_size, img_shape=224)
 
         self.__dict__.update(locals())
@@ -37,11 +37,7 @@ class ViTClassifier(Classifier):
         self.optimizer = optimizers[optimizer]
         self.criterion = nn.CrossEntropyLoss(reduction="none")
 
-        # ViT from torchvision: use weights API (pretrained is deprecated)
-        vit_weights = (
-            models.ViT_B_16_Weights.IMAGENET1K_V1 if transfer else None
-        )
-        self.model = models.vit_b_16(weights=vit_weights)
+        self.model = models.vit_b_16(weights=models.ViT_B_16_Weights.IMAGENET1K_V1)
 
         # Replace classifier head (ViT uses .heads, not .fc)
         in_features = self.model.heads.head.in_features

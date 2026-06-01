@@ -59,7 +59,7 @@ def _shift_type_of_fold(fold):
     return "Organic"
 
 
-def collect_re_accuracy_estimation_data(pretrain=True):
+def collect_re_accuracy_estimation_data():
     """
     Leave-one-synthetic-shift-type-out PRE calibration.
 
@@ -71,9 +71,9 @@ def collect_re_accuracy_estimation_data(pretrain=True):
     calibration.
     """
     bins = 11
-    prefix = "data/pretrain" if pretrain else "data/nopretrain"
+    prefix = "data"
 
-    best = get_all_ood_detector_data(batch_size=1, filter_organic=False, filter_best=True, pretrain=pretrain)
+    best = get_all_ood_detector_data(batch_size=1, filter_organic=False, filter_best=True)
 
     for dataset in best["Dataset"].unique()[::-1]:
 
@@ -86,7 +86,7 @@ def collect_re_accuracy_estimation_data(pretrain=True):
         feature_name = dsd_accuracies["feature_name"].values[0]
 
         data = load_data(dataset, DSD_LUT[feature_name], batch_size=1, samples=1000, shift="",
-                         model=model, pretrain=pretrain)
+                         model=model)
         if data.empty:
             continue
 

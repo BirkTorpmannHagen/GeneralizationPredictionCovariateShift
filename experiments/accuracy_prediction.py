@@ -43,7 +43,7 @@ def _is_synthetic_shift_type(shift_type):
     return shift_type in SYNTHETIC_SHIFTS
 
 
-def _prepare_dr_gap_data(batch_size=1, pretrain=True, filter_best=False):
+def _prepare_dr_gap_data(batch_size=1, filter_best=False):
     """
     Returns detector-rate data with:
         - fold: concrete held-out condition/domain/intensity
@@ -57,7 +57,6 @@ def _prepare_dr_gap_data(batch_size=1, pretrain=True, filter_best=False):
         batch_size=batch_size,
         filter_organic=False,
         filter_best=filter_best,
-        pretrain=pretrain,
     )
 
     if dr_data.empty:
@@ -96,13 +95,13 @@ def _prepare_dr_gap_data(batch_size=1, pretrain=True, filter_best=False):
     return pd.concat(rows, ignore_index=True)
 
 
-def get_merged(batch_size=1, pretrain=True, filter_best=True):
-    df = get_all_ood_detector_data(batch_size, filter_organic=False, filter_best=filter_best, pretrain=pretrain)
+def get_merged(batch_size=1, filter_best=True):
+    df = get_all_ood_detector_data(batch_size, filter_organic=False, filter_best=filter_best)
 
     df_synth = df[df["Shift Intensity"]!="Organic"]
     df_synth.replace(SHIFT_PRINT_LUT, inplace=True)
 
-    df_raw = load_all(batch_size, shift="", pretrain=pretrain)
+    df_raw = load_all(batch_size, shift="")
 
     acc_by_dataset_and_shift = df_raw.groupby(["Dataset", "Model", "fold"])["correct_prediction"].mean().reset_index()
     acc_by_dataset_and_shift.replace(DSD_PRINT_LUT, inplace=True)
@@ -125,10 +124,10 @@ def get_merged(batch_size=1, pretrain=True, filter_best=True):
     merged = merged.merge(acc, on=["Dataset", "fold", "Model"], how="left")
     return merged
 
-def test_generalization_gap_estimation(batch_size, pretrain=False):
+def test_generalization_gap_estimation(batch_size):
     """Figure 1: DR vs generalization gap, one panel per dataset, single row.
     Colorblind-safe palette, explicit shift legend, marker outlines."""
-    merged = get_merged(batch_size, pretrain=pretrain)
+    merged = get_merged(batch_size)
     merged.replace(SHIFT_PRINT_LUT, inplace=True)
     merged = merged[merged["Shift"] != "ind"]
     hue_order = sorted([s for s in merged["Shift"].unique() if pd.notna(s)])
@@ -180,7 +179,7 @@ def test_generalization_gap_estimation(batch_size, pretrain=False):
     plt.savefig("figures/da_vs_generalization.pdf", bbox_inches="tight")
     plt.show()
 
-def pre_predictions(pretrain=True):
+def pre_predictions():
     """
     PRE results normalized to the same calibration schema as Ours/ATC.
 
@@ -189,7 +188,7 @@ def pre_predictions(pretrain=True):
     PRE can be used in MAE tables but not calibration plots.
     """
     try:
-        pre = get_all_pre_data(pretrain=pretrain)
+        pre = get_all_pre_data()
     except Exception as e:
         print(f"[pre_predictions] PRE unavailable: {e}")
         return pd.DataFrame()
@@ -224,7 +223,7 @@ def pre_predictions(pretrain=True):
     )
 
     # Need an InD baseline to express PRE in gap space.
-    raw = load_all(batch_size=1, shift="", pretrain=pretrain)
+    raw = load_all(batch_size=1, shift="")
     if raw.empty:
         print("[pre_predictions] raw data unavailable; cannot compute PRE gaps.")
         return pd.DataFrame()
@@ -278,9 +277,9 @@ def pre_predictions(pretrain=True):
         )
 
     return out
-def get_acc_prediction_results(batch_size, pretrain=False):
-    merged = get_merged(batch_size, pretrain=pretrain, filter_best=False)
-    prefix = "data/pretrain" if pretrain else "data/nopretrain"
+def get_acc_prediction_results(batch_size):
+    merged = get_merged(batch_size, filter_best=False)
+    prefix = "data"
     g = sns.FacetGrid(merged, col="Dataset", row="feature_name", sharex=False, sharey=False)
     g.map_dataframe(sns.scatterplot, x="DR", y="Generalization Gap", hue="Organic", hue_order=["Organic", "Synthetic"], alpha=0.7, edgecolor=None)
 
@@ -363,9 +362,9 @@ def get_acc_prediction_results(batch_size, pretrain=False):
             print(model_df.groupby(["Dataset", "feature_name", "Shift"])[["mae", "naive baseline mae"]].mean())
 
 
-def get_all_pre_data(pretrain=True):
+def get_all_pre_data():
     all_data = []
-    prefix = "data/pretrain" if pretrain else "data/nopretrain"
+    prefix = "data"
 
     for model, dataset in itertools.product(MODELS, DATASETS):
         try:
@@ -380,9 +379,9 @@ def get_all_pre_data(pretrain=True):
 
 
 
-def acc_prediction_table(pretrain):
+def acc_prediction_table():
     dfs = []
-    prefix = "data/pretrain" if pretrain else "data/nopretrain"
+    prefix = "data"
     for model, dataset  in itertools.product(MODELS, DATASETS):
         try:
             df = pd.read_csv(f"{prefix}/{model}/ood_detector_data/{dataset}_acc_prediction_results.csv")
@@ -399,8 +398,8 @@ def acc_prediction_table(pretrain):
     meaned = df.groupby(["Dataset", "Model", "feature_name"])[["mae", "naive baseline mae"]].mean().reset_index()
     print(meaned.groupby(["Dataset",  "feature_name"])[["mae", "naive baseline mae"]].min())
 
-def get_all_acc_prediction_results(pretrain=True):
-    prefix = "data/pretrain" if pretrain else "data/nopretrain"
+def get_all_acc_prediction_results():
+    prefix = "data"
     dfs = []
 
     for model, dataset in itertools.product(MODELS, DATASETS):
@@ -414,16 +413,16 @@ def get_all_acc_prediction_results(pretrain=True):
     all_df = pd.concat(dfs, ignore_index=True)
     return all_df
 
-def _per_fold_method_data(batch_size=1, pretrain=True):
+def _per_fold_method_data(batch_size=1):
     """
     Per-fold MAE for Ours, ATC-MC, ATC-NE, PRE — the same per-(Dataset, Method)
     selection rule as `loo_fold_comparison` (best Model x feature/variant).
     Adds parsed `shift_type` and `intensity` columns for downstream plotting.
     Returns a long DataFrame: Dataset, fold, Method, shift_type, intensity, MAE.
     """
-    raw = load_all(batch_size=batch_size, shift="", pretrain=pretrain)
+    raw = load_all(batch_size=batch_size, shift="")
     dr_data = get_all_ood_detector_data(batch_size, filter_organic=False,
-                                        filter_best=False, pretrain=pretrain)
+                                        filter_best=False)
     if raw.empty or dr_data.empty:
         return pd.DataFrame()
 
@@ -483,7 +482,7 @@ def _per_fold_method_data(batch_size=1, pretrain=True):
     # the held-out fold being predicted, which DOES include synthetic shifts.
     # Per-test-fold MAE: average over val_set calibration choices and Tree.
     try:
-        pre = get_all_pre_data(pretrain=pretrain)
+        pre = get_all_pre_data()
     except Exception as e:
         print(f"[per_fold] PRE unavailable: {e}")
         pre = pd.DataFrame()
@@ -662,7 +661,7 @@ def intensity_breakdown_plot(rows):
     return df
 
 
-def loo_fold_comparison(batch_size=1, pretrain=True, anchor=False):
+def loo_fold_comparison(batch_size=1, anchor=False):
     """
     Leave-one-fold-out per-fold accuracy estimation.
 
@@ -678,11 +677,11 @@ def loo_fold_comparison(batch_size=1, pretrain=True, anchor=False):
     architecture, detector/variant) for the best (Model, feature) per
     (Dataset, Method).
     """
-    raw = load_all(batch_size=batch_size, shift="", pretrain=pretrain)
+    raw = load_all(batch_size=batch_size, shift="")
     if raw.empty:
         return pd.DataFrame()
     dr_data = get_all_ood_detector_data(batch_size, filter_organic=False,
-                                        filter_best=False, pretrain=pretrain)
+                                        filter_best=False)
     if dr_data.empty:
         return pd.DataFrame()
 
@@ -774,7 +773,7 @@ def loo_fold_comparison(batch_size=1, pretrain=True, anchor=False):
     return pivot
 
 
-def _atc_per_cell_data(batch_size=1, pretrain=True):
+def _atc_per_cell_data(batch_size=1):
     """
     Closed-form ATC MAE per (Dataset, Model, intensity, proportion) cell, mirroring
     the analytical mixing used by `get_acc_prediction_results` for "Ours":
@@ -786,7 +785,7 @@ def _atc_per_cell_data(batch_size=1, pretrain=True):
     Per cell we return the *better* of ATC-MC and ATC-NE so the heatmap stays at
     four winner colours (Ours / Baseline / PRE / ATC).
     """
-    raw = load_all(batch_size=batch_size, shift="", pretrain=pretrain)
+    raw = load_all(batch_size=batch_size, shift="")
     if raw.empty:
         return pd.DataFrame()
 
@@ -860,7 +859,7 @@ def error_heatmap():
         ood_detector_data.append(for_model)
     ood_detector_data = pd.concat(ood_detector_data, ignore_index=True)
 
-    pre_data = get_all_pre_data(pretrain=True)
+    pre_data = get_all_pre_data()
 
     pre_data = pre_data.groupby(["Dataset", "dsd", "val_set", "rate", "Model"])["Accuracy Error"].mean().reset_index()
     pre_data["intensity"] = pre_data["val_set"].apply(lambda x: x.split("_")[-1] if "_" in x else "OoD")
@@ -882,7 +881,7 @@ def error_heatmap():
     pre_data = pre_data.groupby(["Dataset", "proportion", "intensity"])[["mae"]].mean().reset_index()
     df["intensity"] = df["intensity"].apply(lambda x: str(round(float(x), 2)) if x!="OoD" else x)
 
-    atc_data = _atc_per_cell_data(batch_size=1, pretrain=True).round(2)
+    atc_data = _atc_per_cell_data(batch_size=1).round(2)
 
     df_grouped = (
         df.groupby(["Dataset", "Model", "feature_name", "proportion", "intensity"])[["mae", "naive baseline mae"]]
@@ -1127,7 +1126,7 @@ def error_per_accuracy(rows):
     return data
 
 
-def dr_gap_correlation_distribution(batch_size=1, pretrain=True):
+def dr_gap_correlation_distribution(batch_size=1):
     """
     Robustness figure addressing the 'cherry-picking' critique.
 
@@ -1140,7 +1139,7 @@ def dr_gap_correlation_distribution(batch_size=1, pretrain=True):
     """
     from scipy.stats import spearmanr
 
-    merged = get_merged(batch_size=batch_size, pretrain=pretrain, filter_best=False)
+    merged = get_merged(batch_size=batch_size, filter_best=False)
     rows = []
     for (dataset, model, feature_name), grp in merged.groupby(["Dataset", "Model", "feature_name"]):
         sub = grp[["DR", "Generalization Gap"]].dropna()
@@ -1184,7 +1183,7 @@ def dr_gap_correlation_distribution(batch_size=1, pretrain=True):
     return corr_df
 
 
-def threshold_method_comparison(batch_size=1, pretrain=True):
+def threshold_method_comparison(batch_size=1):
     """
     Deployability figure addressing the 'threshold protocol' critique.
 
@@ -1200,7 +1199,7 @@ def threshold_method_comparison(batch_size=1, pretrain=True):
     for tm in ("val_optimal", "id_quantile"):
         try:
             df_tm = get_all_ood_detector_data(batch_size, filter_organic=False,
-                                              filter_best=True, pretrain=pretrain,
+                                              filter_best=True,
                                               threshold_method=tm)
         except Exception as e:
             print(f"[threshold_method_comparison] no rows for threshold_method={tm}: {e}")
@@ -1208,10 +1207,10 @@ def threshold_method_comparison(batch_size=1, pretrain=True):
         if df_tm.empty:
             print(f"[threshold_method_comparison] empty data for threshold_method={tm}; "
                   f"re-run ood_detector_correctness_prediction_accuracy (delete the existing "
-                  f"data/pretrain/<model>/ood_detector_data/*.csv first) to populate id_quantile rows.")
+                  f"data/<model>/ood_detector_data/*.csv first) to populate id_quantile rows.")
             continue
 
-        df_raw = load_all(batch_size, shift="", pretrain=pretrain)
+        df_raw = load_all(batch_size, shift="")
         acc = df_raw.groupby(["Dataset", "Model", "fold"])["correct_prediction"].mean().reset_index()
         df_tm.rename(columns={"Fold": "fold"}, inplace=True)
         merged_tm = df_tm.merge(acc, on=["Dataset", "fold", "Model"], how="left")
@@ -1259,7 +1258,7 @@ def threshold_method_comparison(batch_size=1, pretrain=True):
     methods_present = sorted(summary["Threshold"].unique().tolist())
     if "id_quantile" not in methods_present:
         ax.set_title("id_quantile rows missing — re-collect OOD detector data "
-                     "(delete data/pretrain/*/ood_detector_data/*.csv) to populate",
+                     "(delete data/*/ood_detector_data/*.csv) to populate",
                      fontsize=8, color="grey")
     base_line = (res.groupby("Dataset")["Baseline MAE"].mean()
                     .reindex(DATASETS).values)
@@ -1294,7 +1293,7 @@ def _atc_threshold(scores, correct):
     return float(np.quantile(scores, err_rate))
 
 
-def atc_comparison(batch_size=1, pretrain=True):
+def atc_comparison(batch_size=1):
     """
     Compare label-free accuracy estimators per dataset:
       - Naive       : assume InD-val accuracy on every fold
@@ -1307,7 +1306,7 @@ def atc_comparison(batch_size=1, pretrain=True):
     pulled from cached results to keep apples-to-apples (per-fold, no
     bootstrap mixing).
     """
-    raw = load_all(batch_size=batch_size, shift="", pretrain=pretrain)
+    raw = load_all(batch_size=batch_size, shift="")
     if raw.empty:
         print("[atc_comparison] no raw feature data found.")
         return pd.DataFrame()
@@ -1368,7 +1367,7 @@ def atc_comparison(batch_size=1, pretrain=True):
 
     # --- Ours: take per-(Dataset, Model, feature) results at proportion=1 (pure shift),
     #     then pick the best (Model, feature) per Dataset to mirror Table 5.
-    ours = get_all_acc_prediction_results(pretrain=pretrain)
+    ours = get_all_acc_prediction_results()
     if not ours.empty:
         ours = ours[ours["proportion"] == 1].copy()
         scores = ours.groupby(["Dataset", "feature_name", "Model"])["mae"].mean().reset_index()
@@ -1383,7 +1382,7 @@ def atc_comparison(batch_size=1, pretrain=True):
 
     # --- PRE
     try:
-        pre = get_all_pre_data(pretrain=pretrain)
+        pre = get_all_pre_data()
     except Exception as e:
         print(f"[atc_comparison] PRE data unavailable: {e}")
         pre = pd.DataFrame()
@@ -1590,7 +1589,7 @@ def predicted_vs_true_gap_grid(rows):
 
     return calib, summary
 
-def shift_type_loo_predictions(batch_size=1, pretrain=True, seq_length=-1):
+def shift_type_loo_predictions(batch_size=1, seq_length=-1):
     """
     Correct leave-one-shift-type-out protocol.
 
@@ -1609,7 +1608,6 @@ def shift_type_loo_predictions(batch_size=1, pretrain=True, seq_length=-1):
     """
     df = _prepare_dr_gap_data(
         batch_size=batch_size,
-        pretrain=pretrain,
         filter_best=False,
     )
 
@@ -1703,14 +1701,14 @@ def shift_type_loo_predictions(batch_size=1, pretrain=True, seq_length=-1):
 
     return pd.DataFrame(rows)
 
-def atc_predictions(batch_size=1, pretrain=True):
+def atc_predictions(batch_size=1):
     """
     ATC evaluated on the same held-out folds/conditions as the corrected Ours
     protocol.
 
     ATC uses only InD validation labels for threshold calibration.
     """
-    raw = load_all(batch_size=batch_size, shift="", pretrain=pretrain)
+    raw = load_all(batch_size=batch_size, shift="")
 
     if raw.empty:
         return pd.DataFrame()
@@ -1777,7 +1775,7 @@ def atc_predictions(batch_size=1, pretrain=True):
 
     return pd.DataFrame(rows)
 
-def pre_predictions(pretrain=True):
+def pre_predictions():
     """
     PRE results normalized to the same output schema.
 
@@ -1786,7 +1784,7 @@ def pre_predictions(pretrain=True):
     the regression model, and never on the held-out target condition.
     """
     try:
-        pre = get_all_pre_data(pretrain=pretrain)
+        pre = get_all_pre_data()
     except Exception as e:
         print(f"[pre_predictions] PRE unavailable: {e}")
         return pd.DataFrame()
@@ -1841,7 +1839,7 @@ def pre_predictions(pretrain=True):
 
     return pd.DataFrame(rows)
 
-def accuracy_prediction_table(batch_size=1, pretrain=True):
+def accuracy_prediction_table(batch_size=1):
     """
     Main corrected table.
 
@@ -1860,15 +1858,13 @@ def accuracy_prediction_table(batch_size=1, pretrain=True):
     """
     ours = shift_type_loo_predictions(
         batch_size=batch_size,
-        pretrain=pretrain,
     )
 
     atc = atc_predictions(
         batch_size=batch_size,
-        pretrain=pretrain,
     )
 
-    pre = pre_predictions(pretrain=pretrain)
+    pre = pre_predictions()
 
     dfs = [d for d in [ours, atc, pre] if not d.empty]
 
@@ -1926,7 +1922,6 @@ def _shift_type_loo_bernoulli_sequences(
     lengths,
     n_samples=200,
     batch_size=1,
-    pretrain=True,
     random_state=0,
 ):
     """
@@ -1945,7 +1940,6 @@ def _shift_type_loo_bernoulli_sequences(
 
     df = _prepare_dr_gap_data(
         batch_size=batch_size,
-        pretrain=pretrain,
         filter_best=True,
     )
 
@@ -2040,7 +2034,6 @@ def _shift_type_loo_bernoulli_sequences(
 
 def shift_type_loo_predictions_subsampled(
     batch_size=1,
-    pretrain=True,
     seq_length=-1,
     n_samples=1,
     random_state=0,
@@ -2058,7 +2051,6 @@ def shift_type_loo_predictions_subsampled(
 
     df = _prepare_dr_gap_data(
         batch_size=batch_size,
-        pretrain=pretrain,
         filter_best=True,
     )
 
@@ -2215,7 +2207,6 @@ def sequence_length_sensitivity(lengths, n_samples=200, error="std", random_stat
         lengths=lengths,
         n_samples=n_samples,
         batch_size=1,
-        pretrain=True,
         random_state=random_state,
     )
 
@@ -2259,7 +2250,7 @@ def sequence_length_sensitivity(lengths, n_samples=200, error="std", random_stat
 
     return res_df
 
-def method_statistical_tests(batch_size=1, pretrain=True, alpha=0.05):
+def method_statistical_tests(batch_size=1, alpha=0.05):
     """
     Paired statistical comparison of accuracy-prediction methods.
 
@@ -2282,7 +2273,6 @@ def method_statistical_tests(batch_size=1, pretrain=True, alpha=0.05):
 
     pivot_table, df_best = accuracy_prediction_table(
         batch_size=batch_size,
-        pretrain=pretrain,
     )
 
     if df_best.empty:

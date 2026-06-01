@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from decimal import getcontext
 
-from components import Trace, SyntheticOODDetector, OODDetector
+from components import Trace, OODDetector
 from rateestimators import ErrorAdjustmentEstimator, SimpleEstimator
 from riskmodel import DetectorEventTree, BaseEventTree
 
@@ -23,7 +23,7 @@ class Simulator:
 """
 
     def __init__(self, df, ood_test_fold, ood_val_fold, estimator=ErrorAdjustmentEstimator, trace_length=100,
-                 use_synth=False, **kwargs):
+                 **kwargs):
 
         self.df = df
 

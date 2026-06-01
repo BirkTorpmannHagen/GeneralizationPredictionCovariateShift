@@ -8,7 +8,7 @@ from tqdm import tqdm
 from components import OODDetector
 import itertools
 
-def load_all(batch_size=30, samples=100, shift="normal", pretrain=True):
+def load_all(batch_size=30, samples=100, shift="normal"):
     dfs = []
     for model in MODELS:
         for dataset in DATASETS:
@@ -17,11 +17,11 @@ def load_all(batch_size=30, samples=100, shift="normal", pretrain=True):
             if dataset!="Polyp" and model in SEG_MODELS:
                 continue
             for dsd in DSDS:
-                dfs.append(load_data(dataset, dsd, batch_size=batch_size, samples=samples, model=model, shift=shift, pretrain=pretrain))
+                dfs.append(load_data(dataset, dsd, batch_size=batch_size, samples=samples, model=model, shift=shift))
     return pd.concat(dfs)
 
 def load_data(dataset_name, feature_name, batch_size=1, samples=1000, model="resnet", shift="normal"):
-    prefix = f"data/pretrain/{model}/feature_data"
+    prefix = f"data/{model}/feature_data"
     if dataset_name=="Polyp" and feature_name=="msp" or (dataset_name=="Polyp" and model not in SEG_MODELS) :
         return pd.DataFrame() #MSP does not work for segmentation
     try:

@@ -1,7 +1,7 @@
 """Collect post-hoc OOD-detector feature data for all (dataset, model, shift) cells.
 
 Output convention (consumed by `utils.load_data`):
-    data/{pretrain|nopretrain}/{model}/feature_data/{dataset}_{mode}_{feature}.csv
+    data/{model}/feature_data/{dataset}_{mode}_{feature}.csv
 
 Edit `DETECTORS` below to restrict which detectors are recomputed (e.g. only
 `grad_magnitude` after fixing the GradNorm implementation).
@@ -119,7 +119,6 @@ def collect_all(
     datasets=None,
     models=None,
     modes=None,
-    pretrain=True,
     batch_size=8,
     overwrite=False,
 ):

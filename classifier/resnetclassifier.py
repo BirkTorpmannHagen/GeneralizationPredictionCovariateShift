@@ -26,8 +26,7 @@ from torchmetrics import Accuracy
 
 class ResNetClassifier(Classifier):
     def __init__(self, num_classes, resnet_version,
-                 optimizer='adam', lr=1e-6, batch_size=16,
-                 transfer=True):
+                 optimizer='adam', lr=1e-6, batch_size=16):
         super().__init__(num_classes, optimizer, lr, batch_size)
 
         self.__dict__.update(locals())
@@ -42,7 +41,7 @@ class ResNetClassifier(Classifier):
         # instantiate loss criterion
         self.criterion = nn.CrossEntropyLoss(reduction="none")
         # Using a pretrained ResNet backbone
-        self.model = resnets[resnet_version](pretrained=transfer)
+        self.model = resnets[resnet_version](pretrained=True)
         # Replace old FC layer with Identity so we can train our own
         linear_size = list(self.model.children())[-1].in_features
         # replace final layer for fine tuning

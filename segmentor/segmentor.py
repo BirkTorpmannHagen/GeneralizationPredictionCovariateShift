@@ -23,7 +23,7 @@ import pytorch_lightning as pl
 
 
 class SegmentationModel(pl.LightningModule):
-    def __init__(self, transfer=True,
+    def __init__(self,
                  optimizer='adam', lr=1e-3, batch_size=16, model_name="deeplabv3plus"):
         super().__init__()
 

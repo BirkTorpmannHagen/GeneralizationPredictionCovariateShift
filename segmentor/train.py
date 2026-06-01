@@ -15,7 +15,7 @@ warnings.filterwarnings('ignore')
 def train_segmentor():
     model_names = [ "deeplabv3plus"]
     for model_name in model_names:
-        model = SegmentationModel(transfer=False, batch_size=16, model_name=model_name)
+        model = SegmentationModel(batch_size=16, model_name=model_name)
         logger = TensorBoardLogger(save_dir="segmentation_logs")
         checkpoint_callback = ModelCheckpoint(
             monitor="val_loss",           # Metric to monitor

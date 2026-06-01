@@ -285,34 +285,6 @@ class DebiasedOODDetector(OODDetector):
 
 
 
-class SyntheticOODDetector:
-    def __init__(self, tpr, tnr):
-        self.tpr = tpr
-        self.tnr = tnr
-
-
-    def predict(self, batch):
-
-        # print(batch.columns)
-        # input()
-        if type(batch["ood"])==bool:
-            if batch["ood"]:
-                return 1 if np.random.rand() < self.tpr else 0
-            else:
-                return 0 if np.random.rand() < self.tnr else 1
-
-        assert batch["ood"].nunique()==1
-        if batch["ood"].all(): #if the sample is ood
-            #return true with likelihood = tpr, else false (1-tpr)
-            return 1 if np.random.rand() < self.tpr else 0
-        else: #if the sample is ind
-            #return true with likelihood = tnr, else false (1-tnr)
-            return 0 if np.random.rand() < self.tnr else 1
-
-    def get_likelihood(self):
-        return self.tpr, self.tnr
-
-
 class EnsembleOODDetector(OODDetector):
     def __init__(self, df, detector_list):
         self.detector_list = detector_list

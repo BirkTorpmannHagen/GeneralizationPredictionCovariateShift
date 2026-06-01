@@ -90,12 +90,9 @@ def _make_jobs_for_dataset_feature(df, dataset, feature):
 
 
 # ---- main entry ----
-def ood_detector_correctness_prediction_accuracy(batch_size, model="resnet", shift="", pretrain=True):
-    if pretrain:
-        prefix = "data/pretrain"
-    else:
-        prefix = "data/nopretrain"
-    df = load_all(batch_size=batch_size, shift=shift, samples=100, pretrain=pretrain)
+def ood_detector_correctness_prediction_accuracy(batch_size, model="resnet", shift=""):
+    prefix = "data"
+    df = load_all(batch_size=batch_size, shift=shift, samples=100)
     df = df[df["Model"] == model]
     df = df[df["fold"] != "train"]
     if df.empty:
@@ -149,12 +146,9 @@ def ood_detector_correctness_prediction_accuracy(batch_size, model="resnet", shi
             index=False
         )
 
-def get_all_ood_detector_data(batch_size, filter_organic=False, filter_best=False, pretrain=True, threshold_method="val_optimal"):
+def get_all_ood_detector_data(batch_size, filter_organic=False, filter_best=False, threshold_method="val_optimal"):
     dfs = []
-    if pretrain:
-        prefix = "data/pretrain"
-    else:
-        prefix = "data/nopretrain"
+    prefix = "data"
     for model in MODELS:
         if not os.path.exists(f"{prefix}/{model}/ood_detector_data"):
             os.makedirs(f"{prefix}/{model}/ood_detector_data")
@@ -167,7 +161,7 @@ def get_all_ood_detector_data(batch_size, filter_organic=False, filter_best=Fals
             for d in expected_datasets
         )
         if missing:
-            ood_detector_correctness_prediction_accuracy(batch_size, model=model, shift="", pretrain=pretrain)
+            ood_detector_correctness_prediction_accuracy(batch_size, model=model, shift="")
         for dataset, feature in itertools.product(DATASETS, DSDS):
             if dataset=="Polyp" and model not in SEG_MODELS:
                 continue
