@@ -1,0 +1,6 @@
+Dataset,feature_name,Threshold Method,error
+Polyp,knn,val_optimal,name 'ba' is not defined
+Polyp,grad_magnitude,val_optimal,name 'ba' is not defined
+Polyp,energy,val_optimal,name 'ba' is not defined
+Polyp,cross_entropy,val_optimal,name 'ba' is not defined
+Polyp,typicality,val_optimal,name 'ba' is not defined
