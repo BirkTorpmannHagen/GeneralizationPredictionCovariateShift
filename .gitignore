@@ -1,0 +1,24 @@
+# --- Python bytecode ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Checkpoints / training logs ---
+*.ckpt
+*.pt
+*.pth
+**/checkpoints/
+defense_checkpoints/
+classifier_logs/
+segmentation_logs/
+glow_logs/
+
+# --- Markdown: ignore all except README ---
+*.md
+!README.md
+
+# --- Regenerable pipeline data (per-sample detector scores; reproducible via eval_detectors) ---
+data/
+
+# --- Local paper drafting scratch (not versioned) ---
+paper_drafting/

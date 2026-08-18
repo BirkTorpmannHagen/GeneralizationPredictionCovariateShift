@@ -18,7 +18,7 @@ class OfficeHomeTestBed(BaseTestBed):
                 resnet_version=101).to("cuda").eval()
         else:
             self.classifier = ViTClassifier.load_from_checkpoint(f"{prefix}/{model}/OfficeHome/checkpoints/best.ckpt",
-                                                                 num_classes=self.num_classes, )
+                                                                 num_classes=self.num_classes, ).to("cuda").eval()
 
 
         self.glow = GlowPL.load_from_checkpoint("glow_logs/OfficeHome/checkpoints/epoch=99-step=21800.ckpt", in_channel=3, n_flow=32, n_block=4, conv_lu=True, affine=True).cuda().eval()

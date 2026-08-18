@@ -1,0 +1,503 @@
+% references.bib — verified against DBLP / publisher proceedings / arXiv API.
+% Every entry's abstract was checked to match its title/authors and cited role.
+
+% ============================================================
+% ===== A. Accuracy estimation / AutoEval / benchmarks =====
+% ============================================================
+
+@inproceedings{deng2021autoeval,
+  author       = {Weijian Deng and Liang Zheng},
+  title        = {Are Labels Always Necessary for Classifier Accuracy Evaluation?},
+  booktitle    = {{IEEE} Conference on Computer Vision and Pattern Recognition, {CVPR} 2021},
+  pages        = {15069--15078},
+  publisher    = {Computer Vision Foundation / {IEEE}},
+  year         = {2021},
+  doi          = {10.1109/CVPR46437.2021.01482}
+}
+
+@inproceedings{garg2022atc,
+  author       = {Saurabh Garg and Sivaraman Balakrishnan and Zachary Chase Lipton and
+                  Behnam Neyshabur and Hanie Sedghi},
+  title        = {Leveraging Unlabeled Data to Predict Out-of-Distribution Performance},
+  booktitle    = {The Tenth International Conference on Learning Representations, {ICLR} 2022},
+  publisher    = {OpenReview.net},
+  year         = {2022},
+  url          = {https://openreview.net/forum?id=o_HsiMPYh_x}
+}
+
+@inproceedings{guillory2021doc,
+  author       = {Devin Guillory and Vaishaal Shankar and Sayna Ebrahimi and
+                  Trevor Darrell and Ludwig Schmidt},
+  title        = {Predicting with Confidence on Unseen Distributions},
+  booktitle    = {{IEEE/CVF} International Conference on Computer Vision, {ICCV} 2021},
+  pages        = {1114--1124},
+  publisher    = {{IEEE}},
+  year         = {2021},
+  doi          = {10.1109/ICCV48922.2021.00117}
+}
+
+@inproceedings{deng2023nuclearnorm,
+  author       = {Weijian Deng and Yumin Suh and Stephen Gould and Liang Zheng},
+  title        = {Confidence and Dispersity Speak: Characterizing Prediction Matrix
+                  for Unsupervised Accuracy Estimation},
+  booktitle    = {International Conference on Machine Learning, {ICML} 2023},
+  series       = {Proceedings of Machine Learning Research},
+  volume       = {202},
+  pages        = {7658--7674},
+  publisher    = {{PMLR}},
+  year         = {2023},
+  url          = {https://proceedings.mlr.press/v202/deng23e.html}
+}
+
+@inproceedings{xie2024mano,
+  author       = {Renchunzi Xie and Ambroise Odonnat and Vasilii Feofanov and
+                  Weijian Deng and Jianfeng Zhang and Bo An},
+  title        = {MaNo: Exploiting Matrix Norm for Unsupervised Accuracy Estimation
+                  Under Distribution Shifts},
+  booktitle    = {Advances in Neural Information Processing Systems 37 (NeurIPS 2024)},
+  year         = {2024},
+  url          = {http://papers.nips.cc/paper_files/paper/2024/hash/49abf767d606b72f74ea6009176fafeb-Abstract-Conference.html}
+}
+
+@inproceedings{lu2023cot,
+  author       = {Yuzhe Lu and Yilong Qin and Runtian Zhai and Andrew Shen and
+                  Ketong Chen and Zhenlin Wang and Soheil Kolouri and Simon Stepputtis and
+                  Joseph Campbell and Katia P. Sycara},
+  title        = {Characterizing Out-of-Distribution Error via Optimal Transport},
+  booktitle    = {Advances in Neural Information Processing Systems 36 (NeurIPS 2023)},
+  year         = {2023},
+  url          = {http://papers.nips.cc/paper_files/paper/2023/hash/38fd51cf36f28566230a93a5fbeaabbf-Abstract-Conference.html}
+}
+
+@inproceedings{yu2022projnorm,
+  author       = {Yaodong Yu and Zitong Yang and Alexander Wei and Yi Ma and Jacob Steinhardt},
+  title        = {Predicting Out-of-Distribution Error with the Projection Norm},
+  booktitle    = {Proceedings of the 39th International Conference on Machine Learning, {ICML} 2022},
+  series       = {Proceedings of Machine Learning Research},
+  volume       = {162},
+  pages        = {25721--25746},
+  publisher    = {{PMLR}},
+  year         = {2022},
+  url          = {https://proceedings.mlr.press/v162/yu22i.html}
+}
+
+@misc{yu2025odpbench,
+  author       = {Han Yu and Kehan Li and Dongbai Li and Yue He and Xingxuan Zhang and Peng Cui},
+  title        = {ODP-Bench: Benchmarking Out-of-Distribution Performance Prediction},
+  year         = {2025},
+  eprint       = {2510.27263},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  url          = {https://arxiv.org/abs/2510.27263}
+}
+
+@inproceedings{miller2021accuracyline,
+  author       = {John P. Miller and Rohan Taori and Aditi Raghunathan and Shiori Sagawa and
+                  Pang Wei Koh and Vaishaal Shankar and Percy Liang and Yair Carmon and Ludwig Schmidt},
+  title        = {Accuracy on the Line: on the Strong Correlation Between Out-of-Distribution
+                  and In-Distribution Generalization},
+  booktitle    = {Proceedings of the 38th International Conference on Machine Learning, {ICML} 2021},
+  series       = {Proceedings of Machine Learning Research},
+  volume       = {139},
+  pages        = {7721--7735},
+  publisher    = {{PMLR}},
+  year         = {2021},
+  url          = {https://proceedings.mlr.press/v139/miller21b.html}
+}
+
+@inproceedings{baek2022agreementline,
+  author       = {Christina Baek and Yiding Jiang and Aditi Raghunathan and J. Zico Kolter},
+  title        = {Agreement-on-the-line: Predicting the Performance of Neural Networks
+                  under Distribution Shift},
+  booktitle    = {Advances in Neural Information Processing Systems 35 (NeurIPS 2022)},
+  year         = {2022},
+  url          = {http://papers.nips.cc/paper_files/paper/2022/hash/7a8d388b7a17df480856dff1cc079b08-Abstract-Conference.html}
+}
+
+@inproceedings{amoukou2024sequential,
+  author       = {Salim I. Amoukou and Tom Bewley and Saumitra Mishra and Freddy Lecue and
+                  Daniele Magazzeni and Manuela Veloso},
+  title        = {Sequential Harmful Shift Detection Without Labels},
+  booktitle    = {Advances in Neural Information Processing Systems 37 (NeurIPS 2024)},
+  pages        = {129279--129302},
+  publisher    = {Curran Associates, Inc.},
+  year         = {2024},
+  url          = {https://proceedings.neurips.cc/paper_files/paper/2024/hash/e9721921b799b6ea98d37f9e77f1a7fe-Abstract-Conference.html}
+}
+
+@inproceedings{podkopaev2022tracking,
+  author       = {Aleksandr Podkopaev and Aaditya Ramdas},
+  title        = {Tracking the Risk of a Deployed Model and Detecting Harmful Distribution Shifts},
+  booktitle    = {The Tenth International Conference on Learning Representations, {ICLR} 2022},
+  publisher    = {OpenReview.net},
+  year         = {2022},
+  url          = {https://openreview.net/forum?id=Ro_zAjZppv}
+}
+
+% ============================================================
+% ===== B. Attacks on OOD detectors + adaptive attacks =====
+% ============================================================
+
+@inproceedings{azizmalayeri2022oodnotrobust,
+  author       = {Mohammad Azizmalayeri and Arshia Soltani Moakhar and Arman Zarei and
+                  Reihaneh Zohrabi and Mohammad Taghi Manzuri and Mohammad Hossein Rohban},
+  title        = {Your Out-of-Distribution Detection Method is Not Robust!},
+  booktitle    = {Advances in Neural Information Processing Systems 35 (NeurIPS 2022)},
+  year         = {2022},
+  url          = {http://papers.nips.cc/paper_files/paper/2022/hash/1f6591cc41be737e9ba4cc487ac8082d-Abstract-Conference.html}
+}
+
+@inproceedings{sehwag2019openworld,
+  author       = {Vikash Sehwag and Arjun Nitin Bhagoji and Liwei Song and Chawin Sitawarin and
+                  Daniel Cullina and Mung Chiang and Prateek Mittal},
+  title        = {Analyzing the Robustness of Open-World Machine Learning},
+  booktitle    = {Proceedings of the 12th {ACM} Workshop on Artificial Intelligence
+                  and Security, AISec@CCS 2019},
+  pages        = {105--116},
+  publisher    = {{ACM}},
+  year         = {2019},
+  doi          = {10.1145/3338501.3357372}
+}
+
+@article{fort2022nearoodvulnerability,
+  author       = {Stanislav Fort},
+  title        = {Adversarial vulnerability of powerful near out-of-distribution detection},
+  journal      = {CoRR},
+  volume       = {abs/2201.07012},
+  year         = {2022},
+  eprint       = {2201.07012},
+  archivePrefix = {arXiv},
+  url          = {https://arxiv.org/abs/2201.07012}
+}
+
+@inproceedings{chen2021atom,
+  author       = {Jiefeng Chen and Yixuan Li and Xi Wu and Yingyu Liang and Somesh Jha},
+  title        = {{ATOM:} Robustifying Out-of-Distribution Detection Using Outlier Mining},
+  booktitle    = {Machine Learning and Knowledge Discovery in Databases. Research Track
+                  - European Conference, {ECML} {PKDD} 2021, Part {III}},
+  series       = {Lecture Notes in Computer Science},
+  volume       = {12977},
+  pages        = {430--445},
+  publisher    = {Springer},
+  year         = {2021},
+  doi          = {10.1007/978-3-030-86523-8_26}
+}
+
+@inproceedings{bitterwolf2020gem,
+  author       = {Julian Bitterwolf and Alexander Meinke and Matthias Hein},
+  title        = {Certifiably Adversarially Robust Detection of Out-of-Distribution Data},
+  booktitle    = {Advances in Neural Information Processing Systems 33 (NeurIPS 2020)},
+  year         = {2020},
+  url          = {https://proceedings.neurips.cc/paper/2020/hash/b90c46963248e6d7aab1e0f429743ca0-Abstract.html}
+}
+
+@inproceedings{meinke2022prood,
+  author       = {Alexander Meinke and Julian Bitterwolf and Matthias Hein},
+  title        = {Provably Adversarially Robust Detection of Out-of-Distribution Data
+                  (Almost) for Free},
+  booktitle    = {Advances in Neural Information Processing Systems 35 (NeurIPS 2022)},
+  year         = {2022},
+  url          = {http://papers.nips.cc/paper_files/paper/2022/hash/c2c62117283dda155db754e54dbe8d71-Abstract-Conference.html}
+}
+
+@inproceedings{carlini2017bypassing,
+  author       = {Nicholas Carlini and David A. Wagner},
+  title        = {Adversarial Examples Are Not Easily Detected: Bypassing Ten Detection Methods},
+  booktitle    = {Proceedings of the 10th {ACM} Workshop on Artificial Intelligence
+                  and Security, AISec@CCS 2017},
+  pages        = {3--14},
+  publisher    = {{ACM}},
+  year         = {2017},
+  doi          = {10.1145/3128572.3140444}
+}
+
+@inproceedings{tramer2020adaptiveattacks,
+  author       = {Florian Tram{\`{e}}r and Nicholas Carlini and Wieland Brendel and Aleksander Madry},
+  title        = {On Adaptive Attacks to Adversarial Example Defenses},
+  booktitle    = {Advances in Neural Information Processing Systems 33 (NeurIPS 2020)},
+  year         = {2020},
+  url          = {https://proceedings.neurips.cc/paper/2020/hash/11f38f8ecd71867b42433548d1078e38-Abstract.html}
+}
+
+@inproceedings{athalye2018obfuscatedgradients,
+  author       = {Anish Athalye and Nicholas Carlini and David A. Wagner},
+  title        = {Obfuscated Gradients Give a False Sense of Security: Circumventing
+                  Defenses to Adversarial Examples},
+  booktitle    = {Proceedings of the 35th International Conference on Machine Learning, {ICML} 2018},
+  series       = {Proceedings of Machine Learning Research},
+  volume       = {80},
+  pages        = {274--283},
+  publisher    = {{PMLR}},
+  year         = {2018},
+  url          = {http://proceedings.mlr.press/v80/athalye18a.html}
+}
+
+@inproceedings{he2017ensembles,
+  author       = {Warren He and James Wei and Xinyun Chen and Nicholas Carlini and Dawn Song},
+  title        = {Adversarial Example Defense: Ensembles of Weak Defenses are not Strong},
+  booktitle    = {11th {USENIX} Workshop on Offensive Technologies, {WOOT} 2017},
+  publisher    = {{USENIX} Association},
+  year         = {2017},
+  url          = {https://www.usenix.org/conference/woot17/workshop-program/presentation/he}
+}
+
+@inproceedings{madry2018pgd,
+  author       = {Aleksander Madry and Aleksandar Makelov and Ludwig Schmidt and
+                  Dimitris Tsipras and Adrian Vladu},
+  title        = {Towards Deep Learning Models Resistant to Adversarial Attacks},
+  booktitle    = {6th International Conference on Learning Representations, {ICLR} 2018},
+  publisher    = {OpenReview.net},
+  year         = {2018},
+  url          = {https://openreview.net/forum?id=rJzIBfZAb}
+}
+
+% ============================================================
+% ===== C. Attacks on other system properties =====
+% ============================================================
+
+@inproceedings{shumailov2021sponge,
+  author       = {Ilia Shumailov and Yiren Zhao and Daniel Bates and Nicolas Papernot and
+                  Robert Mullins and Ross Anderson},
+  title        = {Sponge Examples: Energy-Latency Attacks on Neural Networks},
+  booktitle    = {{IEEE} European Symposium on Security and Privacy, EuroS{\&}P 2021},
+  pages        = {212--231},
+  publisher    = {{IEEE}},
+  year         = {2021},
+  doi          = {10.1109/EuroSP51992.2021.00024}
+}
+
+@inproceedings{ghorbani2019interpretation,
+  author       = {Amirata Ghorbani and Abubakar Abid and James Y. Zou},
+  title        = {Interpretation of Neural Networks Is Fragile},
+  booktitle    = {The Thirty-Third {AAAI} Conference on Artificial Intelligence, {AAAI} 2019},
+  pages        = {3681--3688},
+  publisher    = {{AAAI} Press},
+  year         = {2019},
+  doi          = {10.1609/aaai.v33i01.33013681}
+}
+
+@inproceedings{dombrowski2019explanations,
+  author       = {Ann{-}Kathrin Dombrowski and Maximilian Alber and Christopher J. Anders and
+                  Marcel Ackermann and Klaus{-}Robert M{\"{u}}ller and Pan Kessel},
+  title        = {Explanations can be manipulated and geometry is to blame},
+  booktitle    = {Advances in Neural Information Processing Systems 32 (NeurIPS 2019)},
+  pages        = {13567--13578},
+  year         = {2019},
+  url          = {https://proceedings.neurips.cc/paper/2019/hash/bb836c01cdc9120a9c984c525e4b1a4a-Abstract.html}
+}
+
+@inproceedings{slack2020fooling,
+  author       = {Dylan Slack and Sophie Hilgard and Emily Jia and Sameer Singh and Himabindu Lakkaraju},
+  title        = {Fooling {LIME} and {SHAP:} Adversarial Attacks on Post hoc Explanation Methods},
+  booktitle    = {{AIES} '20: {AAAI/ACM} Conference on AI, Ethics, and Society 2020},
+  pages        = {180--186},
+  publisher    = {{ACM}},
+  year         = {2020},
+  doi          = {10.1145/3375627.3375830}
+}
+
+@inproceedings{solans2020poisoning,
+  author       = {David Solans and Battista Biggio and Carlos Castillo},
+  title        = {Poisoning Attacks on Algorithmic Fairness},
+  booktitle    = {Machine Learning and Knowledge Discovery in Databases - European Conference,
+                  {ECML} {PKDD} 2020, Part {I}},
+  series       = {Lecture Notes in Computer Science},
+  volume       = {12457},
+  pages        = {162--177},
+  publisher    = {Springer},
+  year         = {2020},
+  doi          = {10.1007/978-3-030-67658-2_10}
+}
+
+@inproceedings{mehrabi2021exacerbating,
+  author       = {Ninareh Mehrabi and Muhammad Naveed and Fred Morstatter and Aram Galstyan},
+  title        = {Exacerbating Algorithmic Bias through Fairness Attacks},
+  booktitle    = {Thirty-Fifth {AAAI} Conference on Artificial Intelligence, {AAAI} 2021},
+  pages        = {8930--8938},
+  publisher    = {{AAAI} Press},
+  year         = {2021},
+  doi          = {10.1609/aaai.v35i10.17080}
+}
+
+@article{obadinma2024calibration,
+  author       = {Stephen Obadinma and Xiaodan Zhu and Hongyu Guo},
+  title        = {Calibration Attacks: {A} Comprehensive Study of Adversarial Attacks
+                  on Model Confidence},
+  journal      = {Transactions on Machine Learning Research},
+  volume       = {2024},
+  year         = {2024},
+  url          = {https://openreview.net/forum?id=TXzz9xwdpv}
+}
+
+@inproceedings{zeng2022attacking,
+  author       = {Huimin Zeng and Zhenrui Yue and Yang Zhang and Ziyi Kou and
+                  Lanyu Shang and Dong Wang},
+  title        = {On Attacking Out-Domain Uncertainty Estimation in Deep Neural Networks},
+  booktitle    = {Proceedings of the Thirty-First International Joint Conference on
+                  Artificial Intelligence, {IJCAI} 2022},
+  pages        = {4893--4899},
+  publisher    = {ijcai.org},
+  year         = {2022},
+  doi          = {10.24963/ijcai.2022/678}
+}
+
+% ============================================================
+% ===== D. Attacks on drift / monitoring =====
+% ============================================================
+
+@inproceedings{hinder2025adversarial,
+  author       = {Fabian Hinder and Valerie Vaquet and Barbara Hammer},
+  title        = {Adversarial Attacks for Drift Detection},
+  booktitle    = {33rd European Symposium on Artificial Neural Networks, Computational
+                  Intelligence and Machine Learning, {ESANN} 2025},
+  year         = {2025},
+  doi          = {10.14428/esann/2025.ES2025-82}
+}
+
+@article{korycki2023adversarial,
+  author       = {Lukasz Korycki and Bartosz Krawczyk},
+  title        = {Adversarial concept drift detection under poisoning attacks for robust
+                  data stream mining},
+  journal      = {Machine Learning},
+  volume       = {112},
+  number       = {10},
+  pages        = {4013--4048},
+  year         = {2023},
+  doi          = {10.1007/s10994-022-06177-w}
+}
+
+% ============================================================
+% ===== E. Certified defenses / ensemble diversity =====
+% ============================================================
+
+@inproceedings{cohen2019certified,
+  author       = {Jeremy Cohen and Elan Rosenfeld and J. Zico Kolter},
+  title        = {Certified Adversarial Robustness via Randomized Smoothing},
+  booktitle    = {Proceedings of the 36th International Conference on Machine Learning, {ICML} 2019},
+  series       = {Proceedings of Machine Learning Research},
+  volume       = {97},
+  pages        = {1310--1320},
+  publisher    = {{PMLR}},
+  year         = {2019},
+  url          = {http://proceedings.mlr.press/v97/cohen19c.html}
+}
+
+@inproceedings{kumar2021center,
+  author       = {Aounon Kumar and Tom Goldstein},
+  title        = {Center Smoothing: Certified Robustness for Networks with Structured Outputs},
+  booktitle    = {Advances in Neural Information Processing Systems 34 (NeurIPS 2021)},
+  pages        = {5560--5575},
+  year         = {2021},
+  url          = {https://proceedings.neurips.cc/paper/2021/hash/2be8328f41144106f7144802f2367487-Abstract.html}
+}
+
+@inproceedings{yang2020dverge,
+  author       = {Huanrui Yang and Jingyang Zhang and Hongliang Dong and Nathan Inkawhich and
+                  Andrew Gardner and Andrew Touchet and Wesley Wilkes and Heath Berry and Hai Li},
+  title        = {{DVERGE:} Diversifying Vulnerabilities for Enhanced Robust Generation of Ensembles},
+  booktitle    = {Advances in Neural Information Processing Systems 33 (NeurIPS 2020)},
+  year         = {2020},
+  url          = {https://proceedings.neurips.cc/paper/2020/hash/3ad7c2ebb96fcba7cda0cf54a2e802f5-Abstract.html}
+}
+
+@article{kariyappa2019improving,
+  author       = {Sanjay Kariyappa and Moinuddin K. Qureshi},
+  title        = {Improving Adversarial Robustness of Ensembles with Diversity Training},
+  journal      = {CoRR},
+  volume       = {abs/1901.09981},
+  year         = {2019},
+  eprint       = {1901.09981},
+  archivePrefix = {arXiv},
+  url          = {http://arxiv.org/abs/1901.09981}
+}
+
+% ============================================================
+% ===== F. OOD detector methods (attacked) =====
+% ============================================================
+
+@inproceedings{hendrycks2017baseline,
+  author       = {Dan Hendrycks and Kevin Gimpel},
+  title        = {A Baseline for Detecting Misclassified and Out-of-Distribution Examples
+                  in Neural Networks},
+  booktitle    = {5th International Conference on Learning Representations, {ICLR} 2017},
+  publisher    = {OpenReview.net},
+  year         = {2017},
+  url          = {https://openreview.net/forum?id=Hkg4TI9xl}
+}
+
+@inproceedings{lee2018simple,
+  author       = {Kimin Lee and Kibok Lee and Honglak Lee and Jinwoo Shin},
+  title        = {A Simple Unified Framework for Detecting Out-of-Distribution Samples
+                  and Adversarial Attacks},
+  booktitle    = {Advances in Neural Information Processing Systems 31 (NeurIPS 2018)},
+  pages        = {7167--7177},
+  year         = {2018},
+  url          = {https://proceedings.neurips.cc/paper/2018/hash/abdeb6f575ac5c6676b747bca8d09cc2-Abstract.html}
+}
+
+@inproceedings{liu2020energy,
+  author       = {Weitang Liu and Xiaoyun Wang and John D. Owens and Yixuan Li},
+  title        = {Energy-based Out-of-distribution Detection},
+  booktitle    = {Advances in Neural Information Processing Systems 33 (NeurIPS 2020)},
+  year         = {2020},
+  url          = {https://proceedings.neurips.cc/paper/2020/hash/f5496252609c43eb8a3d147ab9b9c006-Abstract.html}
+}
+
+@inproceedings{huang2021gradnorm,
+  author       = {Rui Huang and Andrew Geng and Yixuan Li},
+  title        = {On the Importance of Gradients for Detecting Distributional Shifts in the Wild},
+  booktitle    = {Advances in Neural Information Processing Systems 34 (NeurIPS 2021)},
+  pages        = {677--689},
+  year         = {2021},
+  url          = {https://proceedings.neurips.cc/paper/2021/hash/063e26c670d07bb7c4d30e6fc69fe056-Abstract.html}
+}
+
+@inproceedings{sun2021react,
+  author       = {Yiyou Sun and Chuan Guo and Yixuan Li},
+  title        = {ReAct: Out-of-distribution Detection With Rectified Activations},
+  booktitle    = {Advances in Neural Information Processing Systems 34 (NeurIPS 2021)},
+  pages        = {144--157},
+  year         = {2021},
+  url          = {https://proceedings.neurips.cc/paper/2021/hash/01894d6f048493d2cacde3c579c315a3-Abstract.html}
+}
+
+@inproceedings{wang2022vim,
+  author       = {Haoqi Wang and Zhizhong Li and Litong Feng and Wayne Zhang},
+  title        = {ViM: Out-Of-Distribution with Virtual-logit Matching},
+  booktitle    = {{IEEE/CVF} Conference on Computer Vision and Pattern Recognition, {CVPR} 2022},
+  pages        = {4911--4920},
+  publisher    = {{IEEE}},
+  year         = {2022},
+  doi          = {10.1109/CVPR52688.2022.00487}
+}
+
+@inproceedings{sun2022knn,
+  author       = {Yiyou Sun and Yifei Ming and Xiaojin Zhu and Yixuan Li},
+  title        = {Out-of-Distribution Detection with Deep Nearest Neighbors},
+  booktitle    = {International Conference on Machine Learning, {ICML} 2022},
+  series       = {Proceedings of Machine Learning Research},
+  volume       = {162},
+  pages        = {20827--20840},
+  publisher    = {{PMLR}},
+  year         = {2022},
+  url          = {https://proceedings.mlr.press/v162/sun22d.html}
+}
+
+% ===== Benchmark =====
+
+@inproceedings{koh2021wilds,
+  author       = {Pang Wei Koh and Shiori Sagawa and Henrik Marklund and Sang Michael Xie and
+                  Marvin Zhang and Akshay Balsubramani and Weihua Hu and Michihiro Yasunaga and
+                  Richard Lanas Phillips and Irena Gao and Tony Lee and Etienne David and
+                  Ian Stavness and Wei Guo and Berton Earnshaw and Imran S. Haque and
+                  Sara M. Beery and Jure Leskovec and Anshul Kundaje and Emma Pierson and
+                  Sergey Levine and Chelsea Finn and Percy Liang},
+  title        = {{WILDS:} {A} Benchmark of in-the-Wild Distribution Shifts},
+  booktitle    = {Proceedings of the 38th International Conference on Machine Learning, {ICML} 2021},
+  series       = {Proceedings of Machine Learning Research},
+  volume       = {139},
+  pages        = {5637--5664},
+  publisher    = {{PMLR}},
+  year         = {2021},
+  url          = {http://proceedings.mlr.press/v139/koh21a.html}
+}

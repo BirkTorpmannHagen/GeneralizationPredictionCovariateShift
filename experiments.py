@@ -8,6 +8,7 @@ matplotlib.use("Agg")  # non-interactive: write PDFs, don't open windows
 import matplotlib as mpl
 mpl.rcParams['text.usetex'] = False  # local TeX install lacks cmss10.tfm; mathtext is fine for figure prep
 from experiments.accuracy_prediction import *
+from experiments.reviewer_experiments import run_reviewer_experiments
 np.set_printoptions(precision=3, suppress=True)
 
 def run_acc_prediction_experiments():
@@ -28,6 +29,11 @@ def run_acc_prediction_experiments():
     predicted_vs_true_gap_grid(corrected_rows)
     error_per_accuracy(corrected_rows)
     intensity_breakdown_plot(corrected_rows)
+
+    # Additional experiments added in response to the reviews (equal-resource
+    # baselines, stress test, per-architecture, ablations, continuous IoU,
+    # sequence-length intervals). All from cached scores; writes to figures/.
+    run_reviewer_experiments(batch_size=1)
 
 if __name__ == '__main__':
     run_acc_prediction_experiments()

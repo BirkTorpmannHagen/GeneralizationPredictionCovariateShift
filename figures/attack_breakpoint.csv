@@ -1,0 +1,9 @@
+dataset,eps_255,maha_only_evaded,ensemble_all_ID
+OfficeHome,8,0.0,0.0
+OfficeHome,16,0.02083333395421505,0.0416666679084301
+OfficeHome,24,0.125,0.4166666865348816
+OfficeHome,32,0.5,1.0
+Office31,8,0.0,0.0
+Office31,16,0.0,0.0
+Office31,24,0.1458333432674408,1.0
+Office31,32,0.1666666716337204,1.0

@@ -179,104 +179,6 @@ def test_generalization_gap_estimation(batch_size):
     plt.savefig("figures/da_vs_generalization.pdf", bbox_inches="tight")
     plt.show()
 
-def pre_predictions():
-    """
-    PRE results normalized to the same calibration schema as Ours/ATC.
-
-    Requires cached PRE output to contain both a true/observed accuracy and a
-    predicted/estimated accuracy column. If only `Accuracy Error` is cached,
-    PRE can be used in MAE tables but not calibration plots.
-    """
-    try:
-        pre = get_all_pre_data()
-    except Exception as e:
-        print(f"[pre_predictions] PRE unavailable: {e}")
-        return pd.DataFrame()
-
-    if pre.empty:
-        return pd.DataFrame()
-
-    pre = pre.copy()
-    pre = pre[pre["rate"] == 1].copy()
-
-    pred_col = _first_existing_col(
-        pre,
-        [
-            "predicted_acc",
-            "estimated_acc",
-            "Predicted Accuracy",
-            "Estimated Accuracy",
-            "Prediction",
-            "PRE Accuracy",
-        ],
-    )
-
-    true_col = _first_existing_col(
-        pre,
-        [
-            "true_acc",
-            "observed_acc",
-            "Accuracy",
-            "True Accuracy",
-            "Observed Accuracy",
-        ],
-    )
-
-    # Need an InD baseline to express PRE in gap space.
-    raw = load_all(batch_size=1, shift="")
-    if raw.empty:
-        print("[pre_predictions] raw data unavailable; cannot compute PRE gaps.")
-        return pd.DataFrame()
-
-    ind_val = (
-        raw[raw["fold"] == "ind_val"]
-        .groupby(["Dataset", "Model"], as_index=False)["correct_prediction"]
-        .mean()
-        .rename(columns={"correct_prediction": "ind_val_acc"})
-    )
-
-    pre = pre.merge(ind_val, on=["Dataset", "Model"], how="left")
-
-    rows = []
-
-    for _, r in pre.iterrows():
-        fold = r["test_set"]
-        shift_type = _parse_shift_type_from_fold(fold)
-
-        if shift_type in ("ind", "train", "ind_val"):
-            continue
-
-        mae = float(r["Accuracy Error"])
-
-        if pred_col is not None and true_col is not None and pd.notna(r.get("ind_val_acc")):
-            predicted_gap = float(r["ind_val_acc"]) - float(r[pred_col])
-            observed_gap = float(r["ind_val_acc"]) - float(r[true_col])
-        else:
-            predicted_gap = np.nan
-            observed_gap = np.nan
-
-        rows.append({
-            "Dataset": r["Dataset"],
-            "Model": r["Model"],
-            "feature_name": r["dsd"],
-            "fold": fold,
-            "shift_type": shift_type,
-            "category": "Synthetic" if _is_synthetic_shift_type(shift_type) else "Organic",
-            "observed_gap": observed_gap,
-            "predicted_gap": predicted_gap,
-            "MAE": mae,
-            "Method": "PRE",
-        })
-
-    out = pd.DataFrame(rows)
-
-    if out[["observed_gap", "predicted_gap"]].isna().all().all():
-        print(
-            "[pre_predictions] PRE has only error values, not predicted/true "
-            "accuracy columns; PRE will appear in MAE tables but not calibration grid."
-        )
-
-    return out
 def get_acc_prediction_results(batch_size):
     merged = get_merged(batch_size, filter_best=False)
     prefix = "data"
@@ -1148,18 +1050,26 @@ def dr_gap_correlation_distribution(batch_size=1):
         rho, _ = spearmanr(sub["DR"], sub["Generalization Gap"])
         if np.isnan(rho):
             continue
-        # |rho|: detector orientation can flip sign per (detector, architecture) — magnitude
-        # captures monotonic coupling between DR and gap regardless of sign.
+        # Report the SIGNED Spearman rho. The method relies on a POSITIVE
+        # DR-gap coupling, so reporting magnitude alone (previously abs(rho))
+        # would hide anti-correlated configurations. See stress-test analysis.
         rows.append({"Dataset": dataset, "Model": model,
-                     "Detector": feature_name, "rho": abs(float(rho))})
+                     "Detector": feature_name, "rho": float(rho)})
     corr_df = pd.DataFrame(rows)
     if corr_df.empty:
         print("No correlations could be computed; skipping figure.")
         return corr_df
 
-    print("Correlation summary (Spearman rho per dataset):")
+    print("Correlation summary (signed Spearman rho per dataset):")
     print(corr_df.groupby("Dataset")["rho"]
                  .agg(["median", "mean", "min", "max", "count"]))
+    n_total = len(corr_df)
+    n_neg = int((corr_df["rho"] < 0).sum())
+    n_weak = int((corr_df["rho"].abs() < 0.2).sum())
+    print(f"Configurations with NEGATIVE rho: {n_neg}/{n_total} "
+          f"({100.0 * n_neg / n_total:.1f}%); |rho|<0.2: {n_weak}/{n_total} "
+          f"({100.0 * n_weak / n_total:.1f}%)")
+    corr_df.to_csv("figures/dr_gap_signed_correlation.csv", index=False)
 
     cb = sns.color_palette("colorblind")
     models_present = sorted(corr_df["Model"].unique().tolist())
@@ -1171,10 +1081,11 @@ def dr_gap_correlation_distribution(batch_size=1):
     sns.swarmplot(data=corr_df, x="Dataset", y="rho", order=DATASETS,
                   hue="Model", palette=palette, size=4, ax=ax,
                   edgecolor="black", linewidth=0.4)
+    ax.axhline(0.0, color="black", linewidth=0.8, linestyle="-")
     ax.axhline(0.5, color="black", linewidth=0.6, linestyle="--")
-    ax.set_ylabel(r"Spearman $\rho$ (DR vs. gap)")
+    ax.set_ylabel(r"Signed Spearman $\rho$ (DR vs. gap)")
     ax.set_xlabel("")
-    # ax.set_ylim(0, 1.05)
+    ax.set_ylim(-1.05, 1.05)
     ax.legend(title="Architecture", bbox_to_anchor=(1.02, 1.0),
               loc="upper left", frameon=False, fontsize="x-small")
     plt.tight_layout()

@@ -1,0 +1,5 @@
+tag,eps,eps_255,misclassified,ensemble_evasion_all_ID,SUCCESS_wrong_and_healthy,evade_msp,evade_energy,evade_entropy,evade_gradnorm,evade_mahalanobis,evade_knn,evade_vim,evade_react
+CCT_resnet_noise,0.03137254901960784,8,0.9375,0.0,0.0,0.875,0.3125,0.875,0.0,0.0,0.0,0.0,0.0
+CCT_resnet_noise,0.06274509803921569,16,0.9375,0.0,0.0,0.875,0.3125,0.875,0.0,0.0,0.0,0.0,0.0
+CCT_resnet_noise,0.12549019607843137,32,0.9375,0.0,0.0,0.875,0.3125,0.875,0.0,0.0,0.0,0.0,0.0
+CCT_resnet_noise,0.25098039215686274,64,0.9375,0.0,0.0,0.875,0.3125,0.875,0.0,0.0,0.0,0.0,0.0

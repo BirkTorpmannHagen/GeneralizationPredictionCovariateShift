@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import torch.nn
 from segmentation_models_pytorch.utils.metrics import Accuracy
@@ -7,6 +8,18 @@ from datasets.synthetic_shifts import *
 from torch.utils.data import DataLoader, ConcatDataset, random_split, Subset
 import torch.nn as nn
 import torch.nn
+import torchvision.transforms as transforms  # star-exported to all testbeds
+from utils import INPUT_SIZE
+# Dataset builders, star-exported so the classification testbeds (cct/officehome/
+# office31/nico) can reference them via `from testbeds.base import *`.
+from datasets.cct import build_cct_dataset
+from datasets.officehome import build_officehome_dataset
+from datasets.office31 import build_office31_dataset
+from datasets.nico import build_nico_dataset
+# Models/flows referenced by the classification testbeds via star import.
+from classifier.resnetclassifier import ResNetClassifier
+from classifier.vit import ViTClassifier
+from glow.plmodules import GlowPL
 
 from torchmetrics import Accuracy
 

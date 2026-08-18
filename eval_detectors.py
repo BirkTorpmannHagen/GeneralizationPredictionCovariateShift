@@ -18,6 +18,13 @@ from features import (
     knn,
     msp,
     typicality,
+    mahalanobis,
+    vim,
+    react,
+    isolation_forest,
+    lof,
+    ocsvm,
+    pca_recon,
 )
 from ooddetectors import FeatureSD, convert_to_pandas_df, convert_to_pandas_df_no_ind
 from testbeds import (
@@ -26,8 +33,22 @@ from testbeds import (
     Office31TestBed,
     OfficeHomeTestBed,
     PolypTestBed,
+    Camelyon17TestBed,
+    IWildCamTestBed,
 )
 from utils import MODELS, SEG_MODELS, SYNTHETIC_SHIFTS
+
+# Detectors excluding Typicality (Glow), for datasets without a trained flow model.
+DETECTORS_NO_GLOW = [grad_magnitude, cross_entropy, energy, knn, msp]
+
+# New latent-space / hybrid detectors added for the revision (classification only).
+DETECTORS_NEW = [mahalanobis, react, vim]
+
+# Classic anomaly detectors (unifying-view experiment).
+DETECTORS_AD = [isolation_forest, lof, ocsvm, pca_recon]
+
+# For the WILDS additions: all applicable detectors in one sweep (no Glow).
+DETECTORS_ALL_NO_GLOW = DETECTORS_NO_GLOW + DETECTORS_NEW
 
 # ---------------------------------------------------------------------------
 # Configure which detectors to (re)collect. Comment out any you want to skip.
@@ -47,6 +68,8 @@ TESTBEDS = {
     "Office31": Office31TestBed,
     "NICO": NICOTestBed,
     "Polyp": PolypTestBed,
+    "Camelyon17": Camelyon17TestBed,
+    "IWildCam": IWildCamTestBed,
 }
 
 

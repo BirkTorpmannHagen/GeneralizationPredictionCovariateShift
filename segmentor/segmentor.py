@@ -1,5 +1,12 @@
 
-from segmentation_models_pytorch import DeepLabV3Plus, UnetPlusPlus, Segformer
+from segmentation_models_pytorch import DeepLabV3Plus, UnetPlusPlus
+try:
+    # Segformer was added in a later segmentation_models_pytorch release; guard the
+    # import so the Polyp testbed module can still be imported on older smp (0.3.1),
+    # which matters for non-Polyp runs that only trigger this import transitively.
+    from segmentation_models_pytorch import Segformer
+except ImportError:
+    Segformer = None
 from segmentation_models_pytorch.losses import JaccardLoss
 from segmentation_models_pytorch.metrics import get_stats, iou_score
 import warnings
@@ -41,6 +48,9 @@ class SegmentationModel(pl.LightningModule):
         elif model_name=="unet":
             self.segmentor = UnetPlusPlus()
         elif model_name=="segformer":
+            if Segformer is None:
+                raise ImportError("Segformer requires a newer segmentation_models_pytorch "
+                                  "(installed 0.3.1 lacks it); upgrade smp to use the segformer testbed.")
             self.segmentor = Segformer()
 
 

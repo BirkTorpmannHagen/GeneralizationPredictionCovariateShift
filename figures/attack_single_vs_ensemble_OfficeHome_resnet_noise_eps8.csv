@@ -1,0 +1,9 @@
+target,self_evaded,single_success
+msp,0.0,0.0
+energy,0.0,0.0
+entropy,0.0,0.0
+gradnorm,0.0,0.0
+mahalanobis,0.0,0.0
+knn,0.0,0.0
+vim,0.3333333432674408,0.3333333432674408
+react,0.9791666865348816,0.9583333730697632

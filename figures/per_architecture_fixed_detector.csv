@@ -1,0 +1,6 @@
+Dataset,fixed_detector,MAE_fixed_detector
+CCT,kNN,0.1379
+OfficeHome,kNN,0.0212
+Office31,kNN,0.042
+NICO,kNN,0.0714
+Polyp,kNN,0.2121

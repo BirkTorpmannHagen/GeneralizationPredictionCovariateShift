@@ -1,0 +1,21 @@
+% Corrected attack-induced Delta, D1 concealment (predicted-actual, attacked minus benign). Positive = over-report.
+\begin{tabularx}{\linewidth}{l *{6}{Y}}
+\toprule
+Monitor & CCT & OfficeHome & Office31 & NICO++ & iWildCam & Camelyon17 \\
+\midrule
+MSP & $+0.74$ & $+0.98$ & $+1.00$ & $+1.00$ & $+0.99$ & $+1.00$ \\
+Energy & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ \\
+Entropy & $+0.72$ & $+1.00$ & $+1.00$ & $+1.00$ & $+0.99$ & $+1.00$ \\
+ATC-MC & $+0.72$ & $+1.00$ & $+0.90$ & $+0.80$ & $+1.00$ & $+0.70$ \\
+ATC-NE & $+0.71$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+0.74$ \\
+GradNorm & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ \\
+ReAct & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ \\
+Maha & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ \\
+kNN & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ \\
+ViM & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ & $+1.00$ \\
+\midrule
+\emph{mean individual} & $+0.89$ & $+1.00$ & $+0.99$ & $+0.98$ & $+1.00$ & $+0.94$ \\
+\textbf{Ensemble} & $\mathbf{+0.86}$ & $\mathbf{+0.11}$ & $\mathbf{+0.38}$ & $\mathbf{+0.47}$ & $\mathbf{+0.48}$ & $\mathbf{+0.17}$ \\
+\quad\emph{\footnotesize n members} & {\footnotesize 6} & {\footnotesize 10} & {\footnotesize 6} & {\footnotesize 6} & {\footnotesize 11} & {\footnotesize 6} \\
+\bottomrule
+\end{tabularx}

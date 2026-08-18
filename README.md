@@ -99,5 +99,39 @@ This calls every figure/table function in `experiments/accuracy_prediction.py` a
 * `figures/shift_type_loo_rows.csv` — per-fold predictions used by the plotting routines
 * the predicted-vs-true gap grid, per-accuracy error plot, and intensity breakdown PDFs
 
+### 5. Review-response experiments
+
+`python experiments.py` also runs `experiments/reviewer_experiments.py`
+(`run_reviewer_experiments`), the additional experiments added in response to the
+reviews. All are computed from the cached per-sample detector scores — **no
+retraining or re-inference** — and write to `figures/`:
+
+* `equal_resource_baselines.csv` — our DR estimator vs. confidence/entropy/energy/ATC regressions trained on the *same* synthetic calibration shifts (isolates the OOD-rate contribution)
+* `stress_test.csv` / `.pdf` — detectable-but-not-harmful and harmful-but-weakly-detectable folds; signed-ρ failure quadrants
+* `dr_gap_signed_correlation.csv` — signed Spearman ρ per configuration (Figure 2 now shows signed ρ)
+* `per_architecture_mae.csv` / `per_architecture_fixed_detector.csv` — MAE per fixed architecture, and a single detector held fixed across datasets
+* `threshold_sensitivity.csv`, `feature_type_ablation.csv` — 95th-percentile threshold sweep; binary-DR vs. mean/quantile score features
+* `regressor_ablation.csv` — linear vs. Poly-2 / Isotonic / GAM / RandomForest
+* `detector_count_ablation.csv` — MAE vs. number of detectors combined
+* `polyp_continuous_iou.csv` — Polyp estimator refit against continuous soft-IoU degradation
+* `seq_length_intervals.csv` — empirical prediction intervals of the estimator error vs. sequence length
+
+Each function can also be run individually, e.g.
+`python -c "from experiments.reviewer_experiments import equal_resource_baseline_table; equal_resource_baseline_table(1)"`.
+
+### 6. Hard segmentation metrics (requires checkpoints)
+
+The cached data stores only the *soft* Jaccard IoU. To reproduce the **hard**
+mIoU / Dice segmentation results (Review YLV1 W10), run
+
+```bash
+python -m experiments.segmentation_hard_metrics
+```
+
+on a machine that has the segmentation checkpoints
+(`segmentation_logs/checkpoints/<model>/best.ckpt`), the Glow checkpoint, and the
+Polyp datasets. This is the only review-response experiment that re-runs
+inference; it writes `figures/polyp_hard_metrics.csv`.
+
 ## Contact
 For questions, send an e-mail to (ANONYMIZED)
