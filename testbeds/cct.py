@@ -14,7 +14,7 @@ class CCTTestBed(BaseTestBed):
                 f"{prefix}/{model}/CCT/checkpoints/best.ckpt", num_classes=num_classes,
                 resnet_version=101).to("cuda").eval()
         else:
-            self.classifier = ViTClassifier.load_from_checkpoint(f"{prefix}/{model}/CCT/checkpoints/best.ckpt", num_classes=num_classes,)
+            self.classifier = ViTClassifier.load_from_checkpoint(f"{prefix}/{model}/CCT/checkpoints/best.ckpt", num_classes=num_classes,).to("cuda").eval()
 
         self.glow = GlowPL.load_from_checkpoint("glow_logs/CCT/checkpoints/epoch=199-step=166600.ckpt",in_channel=3, n_flow=32, n_block=4, affine=True, conv_lu=True,).cuda().eval()
 

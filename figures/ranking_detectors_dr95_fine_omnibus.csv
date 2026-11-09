@@ -1,0 +1,2 @@
+n_blocks,n_methods,friedman_chi2,friedman_p,iman_davenport_F,iman_davenport_p,kendalls_W,analysis,scope,nemenyi_CD
+120,8,104.62045680238353,1.195899850770065e-19,16.929807845005598,5.351084825794549e-21,0.1245481628599804,detectors_dr95_fine,All,0.9584479211901437

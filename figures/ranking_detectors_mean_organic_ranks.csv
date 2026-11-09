@@ -1,0 +1,13 @@
+Dataset,Model,Energy,GradNorm,MSP,Mahalanobis,ReAct,UniformCE,ViM,kNN
+CCT,resnet,7.0,3.0,2.0,4.0,1.0,8.0,5.0,6.0
+CCT,vit,3.0,6.0,8.0,7.0,2.0,4.0,5.0,1.0
+Camelyon17,resnet,2.0,6.0,8.0,5.0,7.0,3.0,1.0,4.0
+Camelyon17,vit,6.0,8.0,4.0,5.0,1.0,7.0,2.0,3.0
+IWildCam,resnet,1.0,5.0,8.0,3.0,7.0,6.0,2.0,4.0
+IWildCam,vit,1.0,7.0,8.0,4.0,6.0,2.0,3.0,5.0
+NICO,resnet,4.0,3.0,1.0,5.0,2.0,8.0,7.0,6.0
+NICO,vit,4.0,2.0,1.0,8.0,5.0,3.0,6.0,7.0
+Office31,resnet,8.0,6.0,1.0,5.0,4.0,7.0,3.0,2.0
+Office31,vit,5.0,6.0,8.0,2.0,4.0,3.0,1.0,7.0
+OfficeHome,resnet,7.0,1.0,8.0,4.0,3.0,5.0,2.0,6.0
+OfficeHome,vit,3.0,8.0,4.0,7.0,5.0,1.0,6.0,2.0

@@ -1,0 +1,2 @@
+n_blocks,n_methods,friedman_chi2,friedman_p,iman_davenport_F,iman_davenport_p,kendalls_W,analysis,scope,nemenyi_CD
+12,9,72.53481894150421,1.5348091791079404e-12,34.00284900284907,8.567561351797177e-24,0.7555710306406689,calib_slope_dev,All,3.467839945513993

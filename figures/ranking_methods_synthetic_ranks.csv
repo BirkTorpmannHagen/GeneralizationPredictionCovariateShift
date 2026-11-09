@@ -1,0 +1,13 @@
+Dataset,Model,AC,ATC-MC,DoC,LabelShiftL1,MDE,NuclearNorm,Ours-dr95 (nested sel.),Ours-mean (nested sel.),Reg-ATC
+CCT,resnet,7.0,5.0,6.0,1.0,9.0,2.0,3.0,4.0,8.0
+CCT,vit,8.0,6.0,7.0,1.0,9.0,2.0,4.0,3.0,5.0
+Camelyon17,resnet,6.0,5.0,7.0,2.0,9.0,3.0,1.0,4.0,8.0
+Camelyon17,vit,6.0,4.0,5.0,7.0,9.0,1.0,2.0,3.0,8.0
+IWildCam,resnet,9.0,8.0,7.0,2.0,6.0,1.0,3.0,5.0,4.0
+IWildCam,vit,9.0,8.0,7.0,4.0,5.0,3.0,2.0,1.0,6.0
+NICO,resnet,8.0,5.0,6.0,2.0,9.0,3.0,1.0,4.0,7.0
+NICO,vit,9.0,4.0,8.0,7.0,6.0,5.0,2.0,1.0,3.0
+Office31,resnet,8.0,5.0,6.0,1.0,9.0,2.0,3.0,4.0,7.0
+Office31,vit,9.0,3.0,8.0,1.0,5.0,2.0,6.0,7.0,4.0
+OfficeHome,resnet,9.0,8.0,7.0,1.0,6.0,3.0,2.0,4.0,5.0
+OfficeHome,vit,9.0,7.0,8.0,4.0,6.0,2.0,1.0,3.0,5.0

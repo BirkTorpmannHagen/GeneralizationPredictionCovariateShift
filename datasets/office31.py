@@ -1,6 +1,6 @@
 import os
 
-from numpy.lib.index_tricks import index_exp
+
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, Subset, ConcatDataset
 from torchvision.datasets import ImageFolder
@@ -12,7 +12,7 @@ class Office31Dataset(Dataset):
         self.path = path
         self.ind_context=ind_context
 
-        self.ood_contexts = os.listdir(path)
+        self.ood_contexts = sorted(os.listdir(path))  # sorted: ood_val/ood_test assignment must be stable
         self.ood_contexts.remove(ind_context)
         self.num_classes = len(os.listdir(os.path.join(path, self.ind_context, "images")))
 

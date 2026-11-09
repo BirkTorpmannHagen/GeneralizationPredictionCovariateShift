@@ -1,7 +1,7 @@
 import json
 import os
 from glob import glob
-from random import shuffle
+import random
 
 from PIL import Image
 from torch.utils import data
@@ -13,12 +13,12 @@ class NICODataset(data.Dataset):
         self.image_path_list = image_path_list
         self.transform = transform
         self.num_classes = len(os.listdir(os.path.join(*image_path_list[0].split("/")[:-2])))
-        self.classes = os.listdir(os.path.join(*image_path_list[0].split("/")[:-2]))
+        self.classes = sorted(os.listdir(os.path.join(*image_path_list[0].split("/")[:-2])))
         with open(label_map_json, "r") as f:
             self.label_map = json.load(f)
         context_path = os.path.join(*image_path_list[0].split("/")[:-3])
         self.context = image_path_list[0].split("/")[-3]
-        contexts = os.listdir(context_path)
+        contexts = sorted(os.listdir(context_path))
         self.context_map = dict(zip(contexts, range(len(contexts))))
 
     def __len__(self):
@@ -45,22 +45,26 @@ class NICODataset(data.Dataset):
         pass
 
 
-def build_nico_dataset(root, train_transform, val_transform, ind_context):
+def build_nico_dataset(root, train_transform, val_transform, ind_context, seed=42):
     track_data_dir = os.path.join(root, "track_1")
     data_dir = os.path.join(track_data_dir, "public_dg_0416", "train")
     label_map_json = os.path.join(track_data_dir, "dg_label_id_mapping.json")
-    ind_image_path_list = glob(f"{data_dir}/{ind_context}/*/*.jpg")
+    # Sorted + seeded: the InD train/val/test split must be identical between classifier
+    # training and every later feature collection. The previous unseeded shuffle re-drew the
+    # split on every build, so "ind_val"/"ind_test" largely overlapped the classifier's
+    # training images. Changing this requires retraining the NICO classifiers.
+    rng = random.Random(seed)
+    ind_image_path_list = sorted(glob(f"{data_dir}/{ind_context}/*/*.jpg"))
 
     context_path = os.path.join(*ind_image_path_list[0].split("/")[:-3])
-    ood_contexts = os.listdir(context_path)
+    ood_contexts = sorted(os.listdir(context_path))
     ood_contexts.remove(ind_context)
 
-    all_image_paths = glob(f"{data_dir}/*/*/*.jpg")
-    # Filter out the ones containing ind_context
-    ood_image_path_list = [glob(f"{data_dir}/{context}/*/*.jpg") for context in ood_contexts]
-    shuffle(ood_image_path_list)
+    # One list per context, kept aligned with ood_contexts. (Previously the list of lists was
+    # shuffled after the names were fixed, so domain names were assigned to the wrong images.)
+    ood_image_path_list = [sorted(glob(f"{data_dir}/{context}/*/*.jpg")) for context in ood_contexts]
 
-    shuffle(ind_image_path_list)
+    rng.shuffle(ind_image_path_list)
     train_idx = int(len(ind_image_path_list) * 0.8)
     val_idx = int(len(ind_image_path_list) * 0.9)
     train = NICODataset(ind_image_path_list[:train_idx], label_map_json, train_transform)

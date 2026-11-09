@@ -1,0 +1,2 @@
+n_blocks,n_methods,friedman_chi2,friedman_p,iman_davenport_F,iman_davenport_p,kendalls_W,analysis,scope,nemenyi_CD
+120,9,288.5822222222223,1.1061003773431926e-57,51.147416081393295,6.137321208278958e-69,0.30060648148148156,methods_fine,All,1.096627278873843

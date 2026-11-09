@@ -4,8 +4,16 @@ from tqdm import tqdm
 import pickle as pkl
 import numpy as np
 import torch
+from torch.utils.data import DataLoader, Subset
 from multiprocessing import Pool
 from components import ks_distance
+
+# kNN / Mahalanobis / ViM reference database cap. The InD-train set is used only
+# as a *reference* for distance/density detectors (not as an evaluation fold);
+# subsampling it is standard (Sun et al. 2022) and keeps memory + the per-mode
+# reference encoding tractable. Evaluation folds are never subsampled. Only
+# datasets with more than this many training images are affected.
+REFERENCE_CAP = 50000
 
 
 def list_to_str(some_list):
@@ -135,6 +143,21 @@ class FeatureSD(BaseSD):
         features = features.reshape((len(dataloader)*self.testbed.batch_size, self.num_features))
         return features
 
+    def _capped_reference_loader(self):
+        """InD-train loader capped at REFERENCE_CAP for detector reference/fitting.
+
+        Evaluation folds are untouched; only the (non-evaluation) reference set is
+        subsampled, and only when the training set exceeds the cap."""
+        ds = self.testbed.ind_train
+        n = len(ds)
+        if n > REFERENCE_CAP:
+            rng = np.random.default_rng(0)
+            idx = rng.choice(n, REFERENCE_CAP, replace=False)
+            ds = Subset(ds, idx.tolist())
+            print(f"[FeatureSD] capping kNN/Maha/ViM reference {n} -> {REFERENCE_CAP}")
+        return DataLoader(ds, batch_size=self.testbed.batch_size, shuffle=True,
+                          num_workers=self.testbed.num_workers, drop_last=True)
+
     def get_encodings(self, dataloader):
 
         features = np.zeros((len(dataloader), self.testbed.batch_size, self.testbed.classifier.latent_dim))
@@ -173,15 +196,18 @@ class FeatureSD(BaseSD):
         """
 
         #these features are necessary to compute before-hand in order to compute knn and typicality
+        # Reference (InD-train) is capped for the distance/density detectors and for
+        # the (non-evaluation) train fold; all evaluation folds remain full.
+        ref_loader = self._capped_reference_loader()
         if not noind:
-            self.train_test_encodings = self.get_encodings(self.testbed.ind_loader()["ind_train"])
-            train_features, train_loss = self.compute_features_and_loss_for_loaders(self.testbed.ind_loader())
+            self.train_test_encodings = self.get_encodings(ref_loader)
+            train_features, train_loss = self.compute_features_and_loss_for_loaders({"ind_train": ref_loader})
             ind_val_features, ind_val_losses = self.compute_features_and_loss_for_loaders(self.testbed.ind_val_loader())
             ind_test_features, ind_test_losses = self.compute_features_and_loss_for_loaders(self.testbed.ind_test_loader())
             ood_features, ood_losses = self.compute_features_and_loss_for_loaders(self.testbed.ood_loaders())
             return train_features, train_loss, ind_val_features,ind_val_losses, ind_test_features, ind_test_losses, ood_features,  ood_losses
         else:
-            self.train_test_encodings = self.get_encodings(self.testbed.ind_loader()["ind_train"])
+            self.train_test_encodings = self.get_encodings(ref_loader)
             ood_features, ood_losses = self.compute_features_and_loss_for_loaders(self.testbed.ood_loaders())
             return ood_features,  ood_losses
 

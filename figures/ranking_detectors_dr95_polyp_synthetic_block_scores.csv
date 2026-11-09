@@ -1,0 +1,4 @@
+Dataset,Model,Energy,GradNorm,UniformCE,kNN
+Polyp,deeplabv3plus,0.203,0.2176,0.1413,0.2178
+Polyp,segformer,0.103,0.1918,0.0845,0.1351
+Polyp,unet,0.0926,0.3446,0.1143,0.111

@@ -1,0 +1,25 @@
+# Only Python sources and small CSV results are versioned. Everything else is ignored:
+# data and feature caches, model checkpoints and logs, figures, the paper, notes, archives.
+*
+!*/
+!*.py
+!*.csv
+!.gitignore
+
+# Python caches
+__pycache__/
+
+# Data, feature caches, checkpoints and training logs (regenerable, multi-GB)
+data/
+classifier_logs/
+segmentation_logs/
+glow_logs/
+lightning_logs/
+
+# Large per-fold result tables (> 1 MB); regenerate with the experiments/ scripts
+figures/ranking_detector_rows.csv
+figures/paper_method_rows.csv
+figures/ranking_method_rows.csv
+figures/shift_detection_rows.csv
+figures/seq_length_rows.csv
+figures/label_shift_rows.csv

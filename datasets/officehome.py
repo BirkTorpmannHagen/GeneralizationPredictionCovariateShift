@@ -9,7 +9,7 @@ class OfficeHome(Dataset):
     def __init__(self, path, train_transform, val_transform, context="Real World", fold="train"):
         super().__init__()
         self.path = path
-        self.contexts = os.listdir(path)
+        self.contexts = sorted(os.listdir(path))
         self.num_classes = len(os.listdir(os.path.join(path, self.contexts[0])))
 
         # Load the full dataset without splits

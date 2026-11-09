@@ -83,7 +83,8 @@ def _compute_one(args):
 
 
 def _make_jobs_for_dataset_feature(df, dataset, feature):
-    data_filtered = df[(df["Dataset"] == dataset) & (df["feature_name"] == feature)]
+    column_name = FEATURE_COLUMN_ALIAS.get(feature, feature)
+    data_filtered = df[(df["Dataset"] == dataset) & (df["feature_name"] == column_name)]
     if data_filtered.empty:
         return []
     return [(data_filtered, tm, dataset, feature) for tm in THRESHOLD_METHODS]
@@ -146,7 +147,10 @@ def ood_detector_correctness_prediction_accuracy(batch_size, model="resnet", shi
             index=False
         )
 
-def get_all_ood_detector_data(batch_size, filter_organic=False, filter_best=False, threshold_method="val_optimal"):
+def get_all_ood_detector_data(batch_size, filter_organic=False, filter_best=False, threshold_method="id_quantile"):
+    # Default is the InD-only 0.95-quantile threshold, as in the paper. "val_optimal" tunes the
+    # threshold on organic OOD folds (including the evaluation domain itself), so it needs OOD
+    # data and leaks the organic targets; keep it only for the threshold ablation.
     dfs = []
     prefix = "data"
     for model in MODELS:

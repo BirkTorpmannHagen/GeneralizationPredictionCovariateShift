@@ -1,0 +1,3 @@
+ds,n_ps,benign_acc,te_pure_makewrong,te_ensemble_attack,degrade_pure,degrade_ens
+CCT,5,1.0,0.0,0.0,1.0,1.0
+OfficeHome,9,1.0,0.0,0.0,1.0,1.0
