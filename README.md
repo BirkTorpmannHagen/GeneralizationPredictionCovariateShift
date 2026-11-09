@@ -1,7 +1,5 @@
 # GeneralizationPredictionCovariateShift
 
-> **Note to reviewers:** refactoring in progress; this project is derived from a larger, long-term codebase, so there are obsolete code paths, debugging statements, and prototyping parameter changes still in the tree. See the *Obsolete / known-broken code* section at the bottom for the list we are aware of.
-
 Deep vision models often experience accuracy degradation under covariate shift. This raises challenges for reliability and trustworthiness, as deployment streams typically lack labels to measure this degradation. We study whether aggregate out-of-distribution (OOD) detection rates can serve as sequence-level indicators of network accuracy under shift. Across five benchmarks, multiple architectures, six post-hoc OOD detectors, synthetic perturbations, and naturally occurring domain shifts, we observe that detection rates frequently correlate with generalization gaps. We exploit this relationship by fitting a simple linear model that maps OOD detection rates to accuracy degradation using labeled synthetic shifts. At inference time, the estimator requires only unlabeled inputs. Under a leave-one-shift-out cross-validation protocol, it achieves mean absolute errors between 0.02 and 0.10 and outperforms competing methods for unlabeled accuracy estimation both in terms of absolute error and calibration across synthetic and naturally occurring shifts. These results indicate that OOD detectors can provide useful signals for monitoring model performance under covariate shift, with the caveat that their effectiveness depends on the reliability of the observed alignment between detectability and accuracy degradation.
 
 ---
@@ -36,7 +34,7 @@ A working PyTorch + PyTorch-Lightning environment is required. The main third-pa
 
 ```
 torch, torchvision, pytorch-lightning
-numpy, pandas, scipy, scikit-learn, pygam
+numpy, pandas, scipy, scikit-learn,
 matplotlib, seaborn, tqdm
 ```
 
@@ -87,7 +85,7 @@ This sweeps every `(dataset, model, shift)` cell and writes one CSV per detector
 python -c "from experiments.pra import collect_re_accuracy_estimation_data; collect_re_accuracy_estimation_data()"
 ```
 
-This runs the leave-one-synthetic-shift-type-out calibration of the `ErrorAdjustmentEstimator` PRE baseline and writes `data/<model>/pra_data/<dataset>_pre_results.csv`.
+This runs the leave-one-synthetic-shift-type-out calibration of the `ErrorAdjustmentEstimator` PRE baseline and writes `data/<model>/pra_data/<dataset>_pre_results.csv`. The cached results are for the best-performing PRA configuration in terms of detector BA. 
 
 ### 4. Run the paper experiments
 
@@ -101,4 +99,39 @@ This calls every figure/table function in `experiments/accuracy_prediction.py` a
 * `figures/shift_type_loo_rows.csv` — per-fold predictions used by the plotting routines
 * the predicted-vs-true gap grid, per-accuracy error plot, and intensity breakdown PDFs
 
----
+### 5. Review-response experiments
+
+`python experiments.py` also runs `experiments/reviewer_experiments.py`
+(`run_reviewer_experiments`), the additional experiments added in response to the
+reviews. All are computed from the cached per-sample detector scores — **no
+retraining or re-inference** — and write to `figures/`:
+
+* `equal_resource_baselines.csv` — our DR estimator vs. confidence/entropy/energy/ATC regressions trained on the *same* synthetic calibration shifts (isolates the OOD-rate contribution)
+* `stress_test.csv` / `.pdf` — detectable-but-not-harmful and harmful-but-weakly-detectable folds; signed-ρ failure quadrants
+* `dr_gap_signed_correlation.csv` — signed Spearman ρ per configuration (Figure 2 now shows signed ρ)
+* `per_architecture_mae.csv` / `per_architecture_fixed_detector.csv` — MAE per fixed architecture, and a single detector held fixed across datasets
+* `threshold_sensitivity.csv`, `feature_type_ablation.csv` — 95th-percentile threshold sweep; binary-DR vs. mean/quantile score features
+* `regressor_ablation.csv` — linear vs. Poly-2 / Isotonic / GAM / RandomForest
+* `detector_count_ablation.csv` — MAE vs. number of detectors combined
+* `polyp_continuous_iou.csv` — Polyp estimator refit against continuous soft-IoU degradation
+* `seq_length_intervals.csv` — empirical prediction intervals of the estimator error vs. sequence length
+
+Each function can also be run individually, e.g.
+`python -c "from experiments.reviewer_experiments import equal_resource_baseline_table; equal_resource_baseline_table(1)"`.
+
+### 6. Hard segmentation metrics (requires checkpoints)
+
+The cached data stores only the *soft* Jaccard IoU. To reproduce the **hard**
+mIoU / Dice segmentation results (Review YLV1 W10), run
+
+```bash
+python -m experiments.segmentation_hard_metrics
+```
+
+on a machine that has the segmentation checkpoints
+(`segmentation_logs/checkpoints/<model>/best.ckpt`), the Glow checkpoint, and the
+Polyp datasets. This is the only review-response experiment that re-runs
+inference; it writes `figures/polyp_hard_metrics.csv`.
+
+## Contact
+For questions, send an e-mail to (ANONYMIZED)
