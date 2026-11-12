@@ -3,16 +3,26 @@
 Written 2026-11-09. Everything here needs the trained checkpoints, the datasets and a GPU.
 Everything that could be fixed from cached features has already been done on the Mac.
 
+## Recommended order (avoids collecting entropy twice)
+
+1. Sync the code (section 0).
+2. Run the softmax collection on its own: `python collect_softmax_stats.py`. It is independent of the feature recollection and unblocks COT and Nuclear Norm.
+3. Run the full recollection in section 0b. It already includes the entropy detector, for the classification datasets and Polyp, and regenerates the Polyp smear folds with warped masks (0c).
+4. Retrain NICO (section 1). Then recollect NICO only: `collect_all(detectors=DETECTORS_ALL_NO_GLOW, datasets=['NICO'], models=['resnet','vit'], overwrite=True)`, and rerun `python -c "import collect_softmax_stats as c; c.collect(datasets=['NICO'])"`.
+
+Don't also run `collect_gpu_followups.py` after 0b: its entropy step repeats work 0b has already done. It's only the shortcut for when 0b is skipped.
+
 ## 0. Sync code first (both directions)
 
 The GPU machine's `utils.py` was stale too. Copy this repo's versions of these files over before running anything:
 - `utils.py`
 - `features.py`
 - `eval_detectors.py`
-- `collect_softmax_stats.py`
+- `collect_softmax_stats.py` and `uae_stats.py` (the batch statistics it imports)
 - `collect_gpu_followups.py`
 - `datasets/nico.py`, `datasets/office31.py`, `datasets/officehome.py`
 - `testbeds/base.py` (unshuffled evaluation loaders; see 0b)
+- `datasets/synthetic_shifts.py` (smear now warps the segmentation mask; see 0c)
 - `experiments/`
 
 ## 0b. Per-sample pairing bug: recollect all features (required for per-sample analyses)
@@ -27,7 +37,7 @@ The loaders were built with `shuffle=True` (`testbeds/base.py`), so each pass sa
 - *Unaffected:* fold-level averages, because both passes cover the same fold. That covers all the main results: detection rates, mean scores, fold accuracy, ATC/AC/DoC, MDE, the rankings, calibration, and shift-detection AUROC.
 - *Invalid:*
   - PRE, which conditions accuracy on per-sample detector verdicts (`simulations.py`);
-  - the failure-detection AUROC in `reviewer_experiments.detector_quality_vs_coupling`;
+  - the failure-detection AUROC in `ablations.detector_quality_vs_coupling`;
   - the label-shift stress test (`experiments/label_shift.py`, which refuses to run on mispaired data);
   - any other per-sample score/correctness or score/class analysis.
 
@@ -51,6 +61,30 @@ python -c "from experiments.label_shift import paper_assets; paper_assets()"
 ```
 
 The fold-level results should change only marginally (`drop_last` now drops the same samples in both passes); rerun them anyway for consistency.
+
+## 0c. Polyp smear: mask was not warped (excluded until recollected)
+
+**The bug.** `smear` is a geometric `GridDistortion`. `TransformedDataset` warped the image but passed the segmentation mask through unchanged, so for Polyp the prediction is scored against a mask in the wrong place. The IoU (and "accuracy") collapses with intensity even though the image still looks in-distribution: every detector's DR stays near its InD level while accuracy falls from 0.88 to 0.09. Classification is unaffected (a warp does not change a class label).
+
+**Current state.** `utils.INVALID_FOLDS = {"Polyp": ("smear",)}` drops these folds in `load_data`, the PRE results loader and `streaming_eval`, so every analysis and paper asset currently excludes Polyp smear. PRE's trees were still fitted with smear among the calibration families; recomputing PRE (0b, step 2) fixes that.
+
+**The fix (already in the code).** `smear(img, intensity, mask=...)` warps image and mask with the same grid, and `TransformedDataset` uses it whenever the target is a 3-D mask tensor.
+
+**What to run.** Nothing extra: the Polyp recollection in 0b regenerates the smear folds, provided `datasets/synthetic_shifts.py` is synced first. Afterwards, on either machine, set `INVALID_FOLDS = {}` in `utils.py`, delete `figures/perfold_tables.pkl`, and rerun the analyses.
+
+## 0d. Do not analyse a partial sync (GradNorm changed)
+
+The new collection computes GradNorm with the closed-form `features.grad_magnitude` (head-input hook) instead of the old per-sample autograd loop. The new files are on a different scale, and not by a constant factor: for ResNet, new/old means on the mildest synthetic fold are about 2x (CCT), 8x (OfficeHome), 34x (Office31), 0.2x (iWildCam) and 0.8x (Camelyon17). kNN, MSP, Energy, Uniform-CE and ReAct files agree in scale between collections.
+
+Consequence: a data folder that mixes old and new files gives nonsense for GradNorm (a mean-score estimator reached MAE 3.6 on Office31/ResNet). Copy back **all** recollected files for a dataset before running any analysis, then delete `figures/perfold_tables.pkl` and rerun the full chain:
+```bash
+python -m experiments.ranking_analysis && python -m experiments.calibration_analysis && python -m experiments.paper_figures && python -m experiments.paper_artifacts
+```
+Also worth checking once on the GPU machine: that the new `grad_magnitude` matches the autograd loop (`_grad_magnitude_loop`) on a few batches, as its docstring claims, since the old numbers did not.
+
+## 0e. GradNorm is all zeros for Polyp (fix needed before the next Polyp recollection)
+
+`features.grad_magnitude` falls back to `_grad_magnitude_loop` for the segmentation models, which takes `log_softmax` over the output channels. Binary segmentation has a single channel, so the log-softmax is identically 0 and every score is 0 (all `data/*/feature_data/Polyp_*_grad_magnitude.csv` from 2026-11-11 are constant). GradNorm therefore drops out of every Polyp analysis. Fix: for single-channel outputs use the sigmoid analogue (binary cross-entropy of the per-pixel probability against a 0.5 target), then recollect GradNorm for Polyp only.
 
 ## 1. Retrain NICO (required)
 
@@ -85,6 +119,8 @@ This runs three steps:
    - `cot_err`: real COT (Lu et al. 2023). It's the exact optimal-transport cost with cost ‖p − e_y‖∞ against InD-val label marginals.
    - `label_shift_l1`: the old "cot" statistic, which was not COT.
    - Bootstrap batches of 100, used for the set-level shift-detection AUROC.
+
+   It also saves **per-sample softmax matrices** (with labels and sample indices) to `data/softmax/<model>/<dataset>/<fold>.npz`: up to 2,000 random samples per fold, for every fold including `ind_val` and `ind_test`. The label-shift test (`experiments/label_shift.py`) re-batches these offline into class-biased batches (Dirichlet class mixes, 1/2/5-class batches, hardest or easiest classes) to evaluate Nuclear Norm, COT and the label-marginal statistic. **No separate collection of class-biased batches is needed, but these files must be copied back.** The detector-based methods and MDE are re-batched from the recollected feature CSVs in 0b.
 
 ## 3. Copy back
 
