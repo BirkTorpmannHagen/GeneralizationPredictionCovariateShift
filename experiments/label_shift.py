@@ -41,12 +41,13 @@ from sklearn.linear_model import LinearRegression
 
 from experiments.accuracy_prediction import _atc_threshold, _is_synthetic_shift_type, _parse_shift_type_from_fold
 from experiments.ranking_analysis import CLASSIFICATION, CLASSIFIERS, _inner_loso_mae
-from experiments.ablations import mde_statistic
+from experiments.ablations import dr_calibration, mde_statistic
 from utils import DSD_PRINT_LUT, DSDS, FEATURE_COLUMN_ALIAS, load_data
 
 FIG = "figures"
 CACHE = f"{FIG}/perfold_tables.pkl"
 SOFTMAX_DIR = "data/softmax"
+FEATURE_DIR = "data/features"
 N_BATCH = 100
 N_REP = 20
 CAP = 2000
@@ -70,10 +71,11 @@ def _load_block(ds, model, rng):
         if raw.empty:
             continue
         raw = raw[raw["feature_name"] == FEATURE_COLUMN_ALIAS.get(det, det)]
-        # orientation + InD 0.95-quantile threshold, exactly as in ablations._perfold_dr
-        ind, ood = raw[~raw["ood"]], raw[raw["ood"]]
-        hi = ood["feature"].mean() > ind["feature"].mean()
-        thr = float(ind["feature"].quantile(0.95 if hi else 0.05))
+        # orientation + ind_val 0.95-quantile threshold, exactly as in ablations._perfold_dr
+        cal = dr_calibration(raw, 0.95)
+        if cal is None:
+            continue
+        hi, thr = cal
         meta[det] = (hi, thr)
         raw = raw[raw["fold"] != "train"]
         cols = raw[["fold", "idx", "class", "correct_prediction", "feature"]].rename(
@@ -170,14 +172,19 @@ def _perfold(wide_full, fn):
 
 
 def _softmax_block(ds, model):
+    """{fold: (P, y, idx, Z, Hp)}; logits Z and projected features Hp are None when absent."""
     d = os.path.join(SOFTMAX_DIR, model, ds)
     if not os.path.isdir(d):
         return None
+    fdir = os.path.join(FEATURE_DIR, model, ds)
     out = {}
     for fn in os.listdir(d):
         if fn.endswith(".npz"):
             z = np.load(os.path.join(d, fn))
-            out[fn[:-4]] = (z["p"].astype(np.float32), z["y"], z["idx"])
+            Z = z["z"].astype(np.float32) if "z" in z.files else None
+            hp = os.path.join(fdir, fn)
+            Hp = np.load(hp)["h"].astype(np.float32) if os.path.exists(hp) else None
+            out[fn[:-4]] = (z["p"].astype(np.float32), z["y"], z["idx"], Z, Hp)
     return out or None
 
 
@@ -294,7 +301,7 @@ def run_block(ds, model, tables, rng):
             b = _draw(g, scheme, rng, rank)
             true_acc = correct[b].mean(1)
             for name, fn in est.items():
-                pred = np.asarray(fn(b), dtype=float)
+                pred = np.clip(np.asarray(fn(b), dtype=float), 0.0, 1.0)
                 err = pred - true_acc
                 rows.append({"Dataset": ds, "Model": model, "Method": name, "scheme": scheme, "fold": f,
                              "shift_type": cat if cat != "Synthetic" else st, "category": cat,
@@ -311,23 +318,43 @@ def _softmax_rows(ds, model, ind_acc_feat, rank, families, rng):
     sm = _softmax_block(ds, model)
     if sm is None or "ind_val" not in sm:
         return []
-    from collect_softmax_stats import cot_error, nuclear_norm
-    Pv, yv, _ = sm["ind_val"]
+    from uae_stats import cot_error, dispersion, mano, nuclear_norm
+    Pv, yv = sm["ind_val"][0], sm["ind_val"][1]
     ind_acc = float((Pv.argmax(1) == yv).mean())
-    pi = np.bincount(yv, minlength=Pv.shape[1]).astype(float)
+    K = Pv.shape[1]
+    pi = np.bincount(yv, minlength=K).astype(float)
     pi /= pi.sum()
     ref = Pv.mean(0)
-    stats = {"NuclearNorm": nuclear_norm, "COT": lambda P: cot_error(P, pi, rng),
-             "LabelShiftL1": lambda P: float(np.abs(P.mean(0) - ref).sum())}
+    # Each statistic maps (P, Z, Hp) of one batch to a scalar; Z = logits, Hp = projected features.
+    stats = {"NuclearNorm": lambda P, Z, H: nuclear_norm(P),
+             "COT": lambda P, Z, H: cot_error(P, pi, rng),
+             "LabelShiftL1": lambda P, Z, H: float(np.abs(P.mean(0) - ref).sum())}
+    if all(v[3] is not None for v in sm.values()):
+        stats["MaNo"] = lambda P, Z, H: mano(Z)
+    if all(v[4] is not None for v in sm.values()):
+        stats["Dispersion"] = lambda P, Z, H: dispersion(H, P.argmax(1), K=K)
+
+    def ev(fn, P, Z, H, i):
+        return fn(P[i], None if Z is None else Z[i], None if H is None else H[i])
+
+    # Calibrate at the batch size the statistics are evaluated at. Nuclear Norm and COT depend
+    # on the number of samples (the normalized nuclear norm through min(N, C); COT through the
+    # granularity of the empirical label marginal; Dispersion through its cluster-size weights),
+    # so a map fitted on ~2000-sample folds would be misapplied to N_BATCH-sample batches. Each
+    # fold's calibration statistic is therefore the mean over N_REP random N_BATCH-sample subsets
+    # (uniform, i.e. original class mix), as for MDE.
+    cal_rng = np.random.default_rng(SEED)
     recs = []
-    for f, (P, y, _) in sm.items():
+    for f, (P, y, _, Z, H) in sm.items():
         st = _parse_shift_type_from_fold(f)
+        subs = [cal_rng.integers(0, len(P), N_BATCH) for _ in range(N_REP)]
         recs.append({"fold": f, "shift_type": st, "category": "Synthetic" if _is_synthetic_shift_type(st) else "Organic",
-                     **{k: fn(P) for k, fn in stats.items()}, "gap": ind_acc - float((P.argmax(1) == y).mean())})
+                     **{k: float(np.mean([ev(fn, P, Z, H, i) for i in subs])) for k, fn in stats.items()},
+                     "gap": ind_acc - float((P.argmax(1) == y).mean())})
     pf = pd.DataFrame(recs)
     pool_all = pf[pf["category"] == "Synthetic"]
     rows = []
-    for f, (P, y, _) in sm.items():
+    for f, (P, y, _, Z, H) in sm.items():
         if f == "ind_val":
             continue
         st = _parse_shift_type_from_fold(f)
@@ -345,8 +372,8 @@ def _softmax_rows(ds, model, ind_acc_feat, rank, families, rng):
             b = _draw(g, scheme, rng, rank)
             true_acc = correct[b].mean(1)
             for k, fn in stats.items():
-                s = np.array([fn(P[i]) for i in b]).reshape(-1, 1)
-                pred = ind_acc - regs[k].predict(s)
+                s = np.array([ev(fn, P, Z, H, i) for i in b]).reshape(-1, 1)
+                pred = np.clip(ind_acc - regs[k].predict(s).ravel(), 0.0, 1.0)
                 err = pred - true_acc
                 rows.append({"Dataset": ds, "Model": model, "Method": k, "scheme": scheme, "fold": f,
                              "shift_type": cat if cat != "Synthetic" else st, "category": cat,
@@ -354,7 +381,7 @@ def _softmax_rows(ds, model, ind_acc_feat, rank, families, rng):
                              "track_r": _corr(pred.ravel(), true_acc),
                              "true_gap": float(ind_acc - true_acc.mean())})
             if "COT" in stats:  # native COT: predicted accuracy = 1 - transport cost
-                pred = 1.0 - np.array([stats["COT"](P[i]) for i in b])
+                pred = np.clip(1.0 - np.array([ev(stats["COT"], P, Z, H, i) for i in b]), 0.0, 1.0)
                 err = pred - true_acc
                 rows.append({"Dataset": ds, "Model": model, "Method": "COT (native)", "scheme": scheme, "fold": f,
                              "shift_type": cat if cat != "Synthetic" else st, "category": cat,
@@ -392,82 +419,123 @@ if __name__ == "__main__":
 # Paper assets (run after run_label_shift on correctly paired data)
 # ----------------------------------------------------------------------------
 PAPER = "OODDetectorsAreUAE"
-TABLE_METHODS = ["Oracle (fold accuracy)", "Ours (DR)", "Ours (mean)", "NuclearNorm", "COT", "COT (native)",
-                 "ATC (regressed)", "ATC-MC", "MDE", "DoC", "AC"]
+TABLE_METHODS = ["Oracle (fold accuracy)", "Ours (DR)", "Ours (mean)", "MaNo", "Dispersion", "NuclearNorm", "COT",
+                 "COT (native)", "LabelShiftL1", "ATC (regressed)", "ATC-MC", "MDE", "DoC", "AC"]
 METHOD_TEX = {"Oracle (fold accuracy)": "Label-blind oracle", "Ours (DR)": "Ours (DR)",
               "Ours (mean)": "Ours (mean score)", "NuclearNorm": "Nuclear Norm", "COT": "COT",
-              "COT (native)": "COT (native)", "ATC (regressed)": "ATC (regressed)", "ATC-MC": "ATC-MC",
+              "MaNo": "MaNo", "Dispersion": "Dispersion",
+              "COT (native)": "COT (native)", "LabelShiftL1": "Label-marginal $L_1$",
+              "ATC (regressed)": "ATC (regressed)", "ATC-MC": "ATC-MC",
               "MDE": "MDE", "DoC": "DoC", "AC": "AC"}
+OURS = "Ours (DR)"
+COMPARE = ["MaNo", "Dispersion", "NuclearNorm", "COT", "COT (native)", "LabelShiftL1", "ATC (regressed)", "ATC-MC", "MDE", "DoC", "AC"]
+BLOCK = ["Dataset", "Model"]
+FINE_BLOCK = ["Dataset", "Model", "shift_type"]
 
 
-def paper_assets(rows=None, eta=None):
-    import matplotlib.pyplot as plt
-    from scipy.stats import spearmanr
+def label_shift_tests(rows=None, alpha=0.05):
+    """Per batch composition: two-sided Wilcoxon signed-rank tests of our estimator against each
+    method on block-mean MAE, Holm-corrected over the comparisons against ours (as in the main
+    analysis). Two designs: (Dataset, Model) blocks, and (Dataset, Model, shift family) blocks
+    as a sensitivity analysis (not independent within a dataset)."""
+    from scipy.stats import wilcoxon
     rows = pd.read_csv(f"{FIG}/label_shift_rows.csv") if rows is None else rows
-    eta = pd.read_csv(f"{FIG}/label_shift_eta2.csv") if eta is None else eta
-    blk = rows.groupby(["Dataset", "Model", "Method", "scheme"])[["MAE", "track_r"]].mean().reset_index()
-    orc = blk[blk["Method"] == "Oracle (fold accuracy)"].set_index(["Dataset", "Model", "scheme"])["MAE"]
-    blk["excess"] = blk["MAE"] - blk.set_index(["Dataset", "Model", "scheme"]).index.map(orc).values
+    out = []
+    for design, block in (("block", BLOCK), ("fine", FINE_BLOCK)):
+        for sch in SCHEMES:
+            sc = rows[rows["scheme"] == sch].groupby(block + ["Method"])["MAE"].mean().unstack()
+            res = []
+            for m in [c for c in COMPARE if c in sc.columns]:
+                d = (sc[OURS] - sc[m]).dropna()
+                p = float(wilcoxon(d).pvalue) if (d != 0).any() else 1.0
+                res.append({"design": design, "scheme": sch, "method": m, "n_blocks": len(d),
+                            "mae_ours": float(sc[OURS].mean()), "mae_method": float(sc[m].mean()),
+                            "ours_wins": int((d < 0).sum()), "p": p})
+            r = pd.DataFrame(res).sort_values("p").reset_index(drop=True)
+            k = len(r)
+            r["p_holm"] = np.maximum.accumulate([min(1.0, (k - i) * p) for i, p in enumerate(r["p"])])
+            r["significant"] = r["p_holm"] < alpha
+            out.append(r)
+    out = pd.concat(out, ignore_index=True)
+    out.to_csv(f"{FIG}/label_shift_tests.csv", index=False)
+    return out
 
-    # Table: MAE by scheme (mean over blocks), methods present in the data
+
+def paper_assets(rows=None):
+    import matplotlib.pyplot as plt
+    rows = pd.read_csv(f"{FIG}/label_shift_rows.csv") if rows is None else rows
+    tests = label_shift_tests(rows)
+    sig = tests[(tests["design"] == "block") & tests["significant"]
+                & (tests["mae_ours"] < tests["mae_method"])].set_index(["method", "scheme"]).index
+    blk = rows.groupby(["Dataset", "Model", "Method", "scheme"])["MAE"].mean().reset_index()
+
+    # Table: MAE by batch composition (mean over blocks). Dagger: ours significantly better.
     meths = [m for m in TABLE_METHODS if m in set(blk["Method"])]
     piv = blk[blk["Method"].isin(meths)].pivot_table(index="Method", columns="scheme", values="MAE")
     piv = piv.reindex(index=meths, columns=SCHEMES)
     best = piv.drop(index="Oracle (fold accuracy)", errors="ignore").min()
     lines = []
     for m in meths:
-        cells = [(rf"\textbf{{{v:.3f}}}" if m != "Oracle (fold accuracy)" and np.isclose(v, best[s]) else f"{v:.3f}")
-                 for s, v in piv.loc[m].items()]
-        sep = "\\midrule\n" if m == "Ours (DR)" else ""
+        cells = []
+        for sch, v in piv.loc[m].items():
+            c = rf"\textbf{{{v:.3f}}}" if m != "Oracle (fold accuracy)" and np.isclose(v, best[sch]) else f"{v:.3f}"
+            cells.append(c + (r"$^\dagger$" if (m, sch) in sig else ""))
+        sep = "\\midrule\n" if m in ("Ours (DR)", next((x for x in ("MaNo", "Dispersion", "NuclearNorm") if x in meths), None)) else ""
         lines.append(f"{sep}{METHOD_TEX[m]} & " + " & ".join(cells) + r" \\")
-    head = " & ".join(SCHEME_TEX[s] for s in SCHEMES)
-    _ensure = os.makedirs(f"{PAPER}/tables", exist_ok=True)
+    headline = " & ".join(SCHEME_TEX[s] for s in SCHEMES)
+    os.makedirs(f"{PAPER}/tables", exist_ok=True)
     with open(f"{PAPER}/tables/label_shift.tex", "w") as fh:
         fh.write(rf"""\begin{{tabular}}{{l{'c' * len(SCHEMES)}}}
 \toprule
- & {head} \\
+ & {headline} \\
 \midrule
 {chr(10).join(lines)}
 \bottomrule
 \end{{tabular}}
 """)
 
-    # Figure: (a) excess error over the label-blind oracle by scheme; (b) per-detector excess at
-    # k=1 against the class dependence of the detector's scores
+    # Figure: (a) MAE by batch composition; (b) per detector, original mix vs. single-class batches
     plt.rcParams.update({"font.size": 8, "axes.spines.top": False, "axes.spines.right": False})
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(7.2, 2.7), gridspec_kw={"width_ratios": [1.6, 1]})
-    show = [m for m in ["Ours (DR)", "NuclearNorm", "COT", "ATC-MC", "MDE"] if m in set(blk["Method"])]
-    colors = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"]
-    styles = ["-", "--", "-.", ":", (0, (5, 1))]
+    show = [m for m in ["Ours (DR)", "NuclearNorm", "COT", "MaNo", "Dispersion", "ATC-MC", "MDE"]
+            if m in set(blk["Method"])]
+    colors = ["#2a78d6", "#eb6834", "#1baf7a", "#8a5cd6", "#3fb3c4", "#eda100", "#e87ba4"]
+    styles = ["-", "--", "-.", (0, (3, 1, 1, 1)), (0, (1, 1)), ":", (0, (5, 1))]
+    x = range(len(SCHEMES))
+    orc = blk[blk["Method"] == "Oracle (fold accuracy)"].groupby("scheme")["MAE"].mean().reindex(SCHEMES)
+    ax.fill_between(x, 0, orc.values, color="#e4e3df", lw=0, label="Label-blind oracle")
     for k, m in enumerate(show):
-        y = blk[blk["Method"] == m].groupby("scheme")["excess"].mean().reindex(SCHEMES)
-        ax.plot(range(len(SCHEMES)), y.values, color=colors[k], ls=styles[k], marker="o", ms=3.5, lw=1.5,
+        y = blk[blk["Method"] == m].groupby("scheme")["MAE"].mean().reindex(SCHEMES)
+        ax.plot(x, y.values, color=colors[k], ls=styles[k], marker="o", ms=3.5, lw=1.5,
                 label=METHOD_TEX[m])
-    ax.axhline(0, color="#52514e", lw=0.8)
-    ax.set_xticks(range(len(SCHEMES)))
+    ax.set_xticks(list(x))
     ax.set_xticklabels([SCHEME_TEX[s].replace("$", "").replace(r"\alpha{=}", "α=") for s in SCHEMES],
                        rotation=35, ha="right")
-    ax.set_ylabel("MAE − label-blind oracle")
+    ax.set_ylabel("MAE")
+    ax.set_ylim(0, None)
     ax.grid(color="#e4e3df", lw=0.6)
     ax.legend(frameon=False, fontsize=6.5)
-    ax.set_title("(a) Excess error by batch composition", fontsize=8, loc="left")
+    ax.set_title("(a) Accuracy-estimation error by batch composition", fontsize=8, loc="left")
 
-    d = blk[blk["Method"].str.startswith("DR:") & (blk["scheme"].isin(["iid", "k1"]))]
-    d = d.pivot_table(index=["Dataset", "Model", "Method"], columns="scheme", values="excess").reset_index()
-    d["detector"] = d["Method"].str[3:]
-    j = d.merge(eta, on=["Dataset", "Model", "detector"])
-    j["delta"] = j["k1"] - j["iid"]
-    for det, g in j.groupby("detector"):
-        ax2.scatter(g["eta2"], g["delta"], s=12, alpha=0.7, label=det)
-    rho, p = spearmanr(j["eta2"], j["delta"])
-    ax2.set_xlabel("Class dependence of InD scores (η²)")
-    ax2.set_ylabel("Δ excess error, 1 class vs. original")
-    ax2.grid(color="#e4e3df", lw=0.6)
-    ax2.set_title(f"(b) Detectors; Spearman ρ = {rho:.2f} (p = {p:.2g})", fontsize=8, loc="left")
-    ax2.legend(frameon=False, fontsize=5.5, ncol=2)
+    d = blk[blk["Method"].str.startswith("DR:") & blk["scheme"].isin(["iid", "k1"])]
+    d = d.groupby(["Method", "scheme"])["MAE"].mean().unstack().sort_values("k1")
+    o = blk[blk["Method"] == "Oracle (fold accuracy)"].groupby("scheme")["MAE"].mean()
+    d = pd.concat([pd.DataFrame({"iid": [o["iid"]], "k1": [o["k1"]]}, index=["DR:Label-blind oracle"]), d])
+    feat = {"kNN", "Mahalanobis", "ViM"}
+    for i, (m, r) in enumerate(d.iterrows()):
+        col = "#9a9890" if "oracle" in m else ("#2a78d6" if m[3:] in feat else "#eb6834")
+        ax2.plot([r["iid"], r["k1"]], [i, i], color=col, lw=1.4)
+        ax2.scatter([r["iid"]], [i], color="white", edgecolor=col, s=18, zorder=3)
+        ax2.scatter([r["k1"]], [i], color=col, s=18, zorder=3)
+    ax2.set_yticks(range(len(d)))
+    ax2.set_yticklabels([m[3:].replace("UniformCE", "Uniform-CE") for m in d.index])
+    ax2.set_xlabel("MAE: ○ original mix, ● one class")
+    ax2.grid(color="#e4e3df", lw=0.6, axis="x")
+    ax2.set_title("(b) Per detector (DR)", fontsize=8, loc="left")
     fig.tight_layout()
     os.makedirs(f"{PAPER}/figures", exist_ok=True)
     fig.savefig(f"{PAPER}/figures/label_shift.pdf", bbox_inches="tight")
+    fig.savefig(f"{FIG}/label_shift.png", dpi=170, bbox_inches="tight")
     plt.close(fig)
     print("wrote", f"{PAPER}/tables/label_shift.tex", f"{PAPER}/figures/label_shift.pdf")
-    return piv
+    return piv, tests

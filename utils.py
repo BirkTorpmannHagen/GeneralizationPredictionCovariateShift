@@ -33,6 +33,20 @@ def _feature_file_matches(fname, dataset_name, feature_name, shift):
     return feat == feature_name and shift in mode
 
 
+# Shift folds excluded from every analysis until they are recollected.
+# Polyp/smear: the GridDistortion warp was applied to the image but not to the segmentation
+# mask, so the IoU drop is label misalignment, not a covariate-shift effect (see GPU_RERUN.md).
+INVALID_FOLDS = {"Polyp": ("smear",)}
+
+
+def drop_invalid_folds(df, dataset_name, fold_col="fold"):
+    bad = INVALID_FOLDS.get(dataset_name, ())
+    if not bad or df is None or df.empty or fold_col not in df.columns:
+        return df
+    fam = df[fold_col].astype(str).str.split("_").str[0]
+    return df[~fam.isin(bad)].copy()
+
+
 def load_data(dataset_name, feature_name, batch_size=1, samples=1000, model="resnet", shift="normal"):
     prefix = f"data/{model}/feature_data"
     if dataset_name=="Polyp" and feature_name=="msp" or (dataset_name=="Polyp" and model not in SEG_MODELS) :
@@ -43,6 +57,7 @@ def load_data(dataset_name, feature_name, batch_size=1, samples=1000, model="res
     except:
         print(f"no data found for path {prefix}/{dataset_name}_{shift}_{feature_name}.csv")
         return pd.DataFrame()
+    df = drop_invalid_folds(df, dataset_name)
     df["Dataset"]=dataset_name
     df["batch_size"]=batch_size
     df["Model"]=model
@@ -57,7 +72,11 @@ def load_data(dataset_name, feature_name, batch_size=1, samples=1000, model="res
         df.drop(columns=["Unnamed: 0"], inplace=True)
     except:
         pass
-    sampled_ind_val_loss = np.quantile(np.array([df[df["fold"] == "ind_val"]["loss"].sample(batch_size).mean() for _ in range(samples)]), 0.95)
+    if not (df["fold"] == "ind_val").any():
+        # Incomplete collection (e.g. a detector whose recollection is still being synced):
+        # without the InD validation fold nothing can be calibrated, so skip it.
+        print(f"[load_data] {dataset_name}/{model}/{feature_name}: no ind_val fold, skipping")
+        return pd.DataFrame()
 
     if dataset_name=="Polyp":
         df["correct_prediction"] = df["loss"] < 0.5  # arbitrary threshold

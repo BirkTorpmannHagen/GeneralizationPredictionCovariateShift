@@ -48,6 +48,9 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.isotonic import IsotonicRegression
 
+from utils import drop_invalid_folds
+from experiments.ablations import HIGHER_IS_OOD, THRESHOLD_FOLDS
+
 FIGDIR = "figures"
 SEED = 0
 
@@ -81,7 +84,7 @@ def _read_detector(dataset, model, feature):
     frames = []
     for p in sorted(paths):
         try:
-            frames.append(pd.read_csv(p))
+            frames.append(drop_invalid_folds(pd.read_csv(p), dataset))
         except Exception:
             continue
     return pd.concat(frames, ignore_index=True) if frames else None
@@ -141,8 +144,16 @@ def _calibrate_detector(df, col, q=0.95):
     ood = df[df["ood"]]
     if iv.empty or ood.empty:
         return None
-    higher_is_ood = ood[col].mean() > iv[col].mean()
-    thr = float(iv[col].quantile(q)) if higher_is_ood else float(iv[col].quantile(1 - q))
+    # Same rule as the main analysis (ablations.dr_calibration): a-priori orientation,
+    # threshold from the THRESHOLD_FOLDS in-distribution folds.
+    det = col[len("feat_"):]
+    if det in HIGHER_IS_OOD:
+        higher_is_ood = HIGHER_IS_OOD[det]
+    else:  # generic anomaly detectors without a fixed convention: orient on calibration folds
+        syn = df[df["family"].isin(CALIB_FAMILIES)]
+        higher_is_ood = syn[col].mean() > iv[col].mean()
+    ref = df[df["fold"].isin(THRESHOLD_FOLDS)][col]
+    thr = float(ref.quantile(q)) if higher_is_ood else float(ref.quantile(1 - q))
     ind_acc = float(iv["correct_prediction"].mean())
     pool = df[df["family"].isin(CALIB_FAMILIES)]
     recs = []

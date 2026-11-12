@@ -77,14 +77,19 @@ def salt_and_pepper(x, intensity, scale=0.25):
     x[noise>1-scale] = 1
     return x
 
-def smear(img, intensity):
+def smear(img, intensity, mask=None):
+    """Grid distortion. A geometric warp: for segmentation, pass ``mask`` so the label is
+    warped identically (returns (img, mask)); otherwise the mask no longer matches the image."""
     seed_all(0)
     x = img.permute(1, 2, 0).numpy()
     desat = albumentations.GridDistortion(always_apply=True, distort_limit=intensity*2)
     transforms = alb.Compose([desat])
-    transformed = transforms(image=x)["image"]
-    transformed = ToTensor()(transformed)
-    return transformed
+    if mask is None:
+        return ToTensor()(transforms(image=x)["image"])
+    m = mask.permute(1, 2, 0).numpy().astype(np.uint8)
+    out = transforms(image=x, mask=m)
+    m_out = torch.from_numpy(np.asarray(out["mask"]).reshape(m.shape)).permute(2, 0, 1).to(mask.dtype)
+    return ToTensor()(out["image"]), m_out
 
 def jpeg(x, intensity):
     seed_all(0)
@@ -123,7 +128,13 @@ class TransformedDataset(data.Dataset):
         batch = self.dataset.__getitem__(index)
         x = batch[0]
         rest = batch[1:]
-        x = torch.clip(self.transform(x, self.transform_param), 0, 1)
+        is_mask = bool(rest) and torch.is_tensor(rest[0]) and rest[0].dim() == 3
+        if self.transform is smear and is_mask:  # geometric shift: warp the segmentation mask too
+            x, mask = self.transform(x, self.transform_param, mask=rest[0])
+            rest = (mask, *rest[1:])
+        else:
+            x = self.transform(x, self.transform_param)
+        x = torch.clip(x, 0, 1)
         # if index==0:
         #     plt.imshow(x.permute(1,2,0))
         #     plt.savefig(f"test_plots/{self.transform_name}_{self.transform_param}.png")

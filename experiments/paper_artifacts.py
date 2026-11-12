@@ -36,6 +36,8 @@ METHOD_TEX = {
     "LabelShiftL1": "Label-marginal $L_1$",
     "COT": "COT",
     "COT (native)": "COT (native)",
+    "MaNo": "MaNo",
+    "Dispersion": "Dispersion",
     "Reg-ATC": "ATC (regressed)",
     "ATC-MC": "ATC-MC",
     "ATC-NE": "ATC-NE",
@@ -54,13 +56,14 @@ ORIGIN = {
     "UniformCE": "OOD detector",
     "MSP (= AC, DoC)": "Both", "Entropy": "Both",
     "ATC (soft rate)": "UAE method", "MDE": "UAE method",
-    "NuclearNorm": "UAE method", "COT": "UAE method",
+    "NuclearNorm": "UAE method", "COT": "UAE method", "MaNo": "UAE method", "Dispersion": "UAE method",
 }
 SIGNAL = {
     "kNN": "feature distance", "Mahalanobis": "feature distance", "ViM": "feature + logit",
     "ReAct": "clipped logit", "Energy": "logit", "GradNorm": "gradient", "UniformCE": "logit",
     "MSP (= AC, DoC)": "confidence", "Entropy": "confidence", "ATC (soft rate)": "confidence",
     "MDE": "logit (batch)", "NuclearNorm": "prediction matrix", "COT": "prediction matrix",
+    "MaNo": "normalized logits", "Dispersion": "feature clusters",
 }
 ORIGIN_LABEL = {"OOD detector": "OOD detector", "UAE method": "UAE method",
                 "Both": "Both (OOD baseline and UAE score)"}
@@ -272,11 +275,12 @@ def table_calibration():
                      f"{r['binned_CE']:.3f} & {100 * r['missed_rate']:.0f}\\% & {nat} \\\\")
     body = rf"""\begin{{table*}}[t]
 \centering
-\caption{{Calibration of predicted against observed accuracy gaps. Bias: mean of predicted minus
-observed gap. Slope and $R^2$: least-squares fit of predicted on observed gap (slope 1 is ideal;
-slopes below 1 compress large drops toward zero). Binned CE: calibration error over observed-gap bins of
-width 0.1. Missed: share of drops larger than 0.2 that are underestimated by more than 0.1, the
-failure that hides degradation from a monitor. All held-out folds ({int(a['n'].iloc[0])} per method)
+\caption{{Calibration of predicted against observed accuracy. Bias: mean of predicted minus
+observed accuracy (positive values overstate accuracy). Slope and $R^2$: least-squares fit of predicted
+on observed accuracy (slope 1 is ideal; slopes below 1 compress large accuracy drops toward InD accuracy).
+Binned CE: calibration error over observed-accuracy bins of width 0.1. Missed: share of accuracy drops
+larger than 0.2 whose accuracy is overestimated by more than 0.1, the failure that hides degradation
+from a monitor. All held-out folds ({int(a['n'].iloc[0])} per method)
 and natural shifts only ({int(n['n'].iloc[0])} per method, {int(n['n_large'].iloc[0])} large drops).}}
 \label{{tab:calibration}}
 \small

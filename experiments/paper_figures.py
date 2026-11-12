@@ -19,8 +19,9 @@ import pandas as pd
 from scipy.stats import spearmanr
 from sklearn.linear_model import LinearRegression
 
+from experiments.ablations import dr_calibration
 from experiments.accuracy_prediction import pre_predictions
-from experiments.calibration_analysis import _calib_metrics
+from experiments.calibration_analysis import _calib_metrics, with_accuracy
 from experiments.ranking_analysis import (CLASSIFICATION, CLASSIFIERS, SEGMENTORS, _inner_loso_mae,
                                           _nested_selection_rows, _perfold_tables, cd_diagram,
                                           wilcoxon_holm, rank_matrix)
@@ -35,7 +36,8 @@ DS_TEX = {"CCT": "CCT", "OfficeHome": "OfficeHome", "Office31": "Office31", "NIC
 METHOD_TEX = {
     "Ours-dr95 (nested sel.)": "Ours (DR)", "Ours-mean (nested sel.)": "Ours (mean score)",
     "NuclearNorm": "Nuclear Norm", "LabelShiftL1": "Label-marginal $L_1$", "COT": "COT",
-    "COT (native)": "COT (native)", "Reg-ATC": "ATC (regressed)", "ATC-MC": "ATC-MC",
+    "COT (native)": "COT (native)", "MaNo": "MaNo", "Dispersion": "Dispersion",
+    "Reg-ATC": "ATC (regressed)", "ATC-MC": "ATC-MC",
     "ATC-NE": "ATC-NE", "MDE": "MDE", "DoC": "DoC", "AC": "AC", "PRE": "PRE", "PRE-0": "PRE-0",
 }
 METHOD_PLAIN = {k: v.replace("$L_1$", "L1") for k, v in METHOD_TEX.items()}
@@ -82,6 +84,33 @@ def _save(fig, name):
     print("wrote", f"{PAPER}/figures/{name}.pdf")
 
 
+def _facets(n, panel_w=1.8, panel_h=1.75, sharex=False, sharey=False):
+    """Column-wrapped facet grid: <= 3 panels in one row, otherwise two rows with the shorter
+    bottom row centred (4 -> 2+2, 6 -> 3+3, 7 -> 4+3). Returns (fig, axes, first_col) where
+    first_col[i] says whether panel i starts a row (gets the y-label)."""
+    ncol = n if n <= 3 else int(np.ceil(n / 2))
+    nrow = int(np.ceil(n / ncol))
+    fig = plt.figure(figsize=(panel_w * ncol, panel_h * nrow + 0.35))
+    gs = fig.add_gridspec(nrow, 2 * ncol)
+    axes, first_col = [], []
+    for i in range(n):
+        r, c = divmod(i, ncol)
+        in_row = min(ncol, n - r * ncol)
+        off = ncol - in_row  # centre a short last row (in half-column units)
+        kw = {}
+        if axes and sharex:
+            kw["sharex"] = axes[0]
+        if axes and sharey:
+            kw["sharey"] = axes[0]
+        axes.append(fig.add_subplot(gs[r, off + 2 * c: off + 2 * c + 2], **kw))
+        first_col.append(c == 0)
+    if sharey:
+        for ax, fc in zip(axes, first_col):
+            if not fc:
+                ax.tick_params(labelleft=False)
+    return fig, axes, first_col
+
+
 # ----------------------------------------------------------------------------
 # Data
 # ----------------------------------------------------------------------------
@@ -112,7 +141,7 @@ def method_rows(t):
 # Tables
 # ----------------------------------------------------------------------------
 def table_mae_per_dataset(rows):
-    order = ["Ours-dr95 (nested sel.)", "Ours-mean (nested sel.)", "NuclearNorm", "LabelShiftL1",
+    order = ["Ours-dr95 (nested sel.)", "Ours-mean (nested sel.)", "MaNo", "Dispersion", "NuclearNorm", "COT", "LabelShiftL1",
              "Reg-ATC", "ATC-MC", "MDE", "DoC", "AC", "PRE"]
     order = [m for m in order if m in rows["Method"].unique()]
     # mean over architectures of the per-(dataset, architecture) mean MAE
@@ -130,7 +159,7 @@ def table_mae_per_dataset(rows):
             cells.append("--" if pd.isna(v) else (rf"\textbf{{{v:.3f}}}" if np.isclose(v, best[d]) else f"{v:.3f}"))
         c = cls[m]
         cells.append("--" if pd.isna(c) else (rf"\textbf{{{c:.3f}}}" if np.isclose(c, cls.min()) else f"{c:.3f}"))
-        sep = "\\midrule\n" if m == "NuclearNorm" else ""
+        sep = "\\midrule\n" if m == next((x for x in ("MaNo", "Dispersion", "NuclearNorm") if x in order), None) else ""
         lines.append(f"{sep}{METHOD_TEX[m]} & " + " & ".join(cells) + r" \\")
     head = " & ".join(DS_TEX[d] for d in DATASETS_ALL)
     body = rf"""\begin{{tabular}}{{l{'c' * len(DATASETS_ALL)}c}}
@@ -155,7 +184,8 @@ def table_pairwise():
         other = r["method_1"] if flip else r["method_2"]
         mo, mx = (r["mean_mae_2"], r["mean_mae_1"]) if flip else (r["mean_mae_1"], r["mean_mae_2"])
         wo, wx = (r["wins_2"], r["wins_1"]) if flip else (r["wins_1"], r["wins_2"])
-        out.append((other, mo, mx, int(wo), int(wx), r["p_holm"]))
+        p = r["p_holm_control"] if "p_holm_control" in r and pd.notna(r["p_holm_control"]) else r["p_holm"]
+        out.append((other, mo, mx, int(wo), int(wx), p))
     out.sort(key=lambda x: x[2])
     lines = [f"{METHOD_TEX.get(o, o)} & {mx:.3f} & {mo - mx:+.3f} & {wo}/{wo + wx} & "
              f"{'$<$0.001' if p < 1e-3 else f'{p:.3f}'}{'$^*$' if p < 0.05 else ''} \\\\"
@@ -174,15 +204,12 @@ Comparison method & MAE & $\Delta$MAE (ours $-$ method) & Ours wins & $p_{{\math
 # ----------------------------------------------------------------------------
 # Figures
 # ----------------------------------------------------------------------------
-def fig_dr_vs_gap(t):
-    """Per dataset: the (architecture, detector) whose DR correlates most with the gap on the
-    synthetic calibration folds; synthetic folds grey, natural shifts highlighted."""
+def fig_dr_vs_acc(t):
+    """Per dataset: the (architecture, detector) whose DR correlates most strongly (negatively)
+    with accuracy on the synthetic calibration folds; synthetic folds grey, natural shifts
+    highlighted. (accuracy = InD-val accuracy - gap, so rho(DR, acc) = -rho(DR, gap).)"""
     _style()
-    # 4 panels on top, 3 centred underneath: 8-column grid, each panel spans 2 columns
-    fig = plt.figure(figsize=(7.2, 4.3))
-    gs = fig.add_gridspec(2, 8)
-    slots = [gs[0, 0:2], gs[0, 2:4], gs[0, 4:6], gs[0, 6:8], gs[1, 1:3], gs[1, 3:5], gs[1, 5:7]]
-    axes = [fig.add_subplot(sl) for sl in slots]
+    fig, axes, first_col = _facets(len(DATASETS_ALL), panel_w=1.8, panel_h=1.95)
     for ax, ds in zip(axes, DATASETS_ALL):
         best, best_r = None, -np.inf
         for (d, m, det, agg), pf in t.items():
@@ -194,21 +221,26 @@ def fig_dr_vs_gap(t):
                 if r > best_r:
                     best, best_r = (m, det, pf), r
         m, det, pf = best
-        pf = pf[pf["fold"] != "ind_val"]
+        # gap = InD-val accuracy - fold accuracy; recover raw accuracy for the y-axis
+        raw = load_data(ds, det, batch_size=1, samples=1, model=m, shift="")
+        raw = raw[raw["feature_name"] == FEATURE_COLUMN_ALIAS.get(det, det)]
+        ind_acc = float(raw.loc[raw["fold"] == "ind_val", "correct_prediction"].mean())
+        pf = pf[pf["fold"] != "ind_val"].assign(acc=lambda d: ind_acc - d["gap"])
         syn = pf[pf["category"] == "Synthetic"]
         org = pf[(pf["category"] == "Organic") & (pf["fold"] != "ind_test")]
-        ax.scatter(syn["stat"], syn["gap"], s=6, color="#9a9890", alpha=0.6, lw=0, label="synthetic")
-        ax.scatter(org["stat"], org["gap"], s=28, marker="D", color="#2a78d6", edgecolor="white",
+        ax.scatter(syn["stat"], syn["acc"], s=6, color="#9a9890", alpha=0.6, lw=0, label="synthetic")
+        ax.scatter(org["stat"], org["acc"], s=28, marker="D", color="#2a78d6", edgecolor="white",
                    lw=0.8, label="natural", zorder=3)
-        ax.set_title(f"{DS_TEX[ds]}\n{m} / {DSD_PRINT_LUT.get(det, det)} (ρ={best_r:.2f})", fontsize=7.5)
+        ax.set_title(f"{DS_TEX[ds]}\n{m} / {DSD_PRINT_LUT.get(det, det)} (ρ={-best_r:.2f})", fontsize=7.5)
         ax.set_xlabel("Detection rate", fontsize=7.5)
         ax.tick_params(labelsize=7)
         _grid(ax)
-    for k in (0, 4):
-        axes[k].set_ylabel("Generalization gap Δ", fontsize=7.5)
-    axes[0].legend(frameon=False, fontsize=6.5, loc="upper left")
+    for ax, fc in zip(axes, first_col):
+        if fc:
+            ax.set_ylabel("Accuracy", fontsize=7.5)
+    axes[0].legend(frameon=False, fontsize=6.5, loc="lower left")
     fig.tight_layout()
-    _save(fig, "dr_vs_gap")
+    _save(fig, "dr_vs_acc")
 
 
 def fig_signed_rho(t):
@@ -220,7 +252,7 @@ def fig_signed_rho(t):
         pf = pf[~pf["fold"].isin(["ind_val", "ind_test"])]
         if pf["stat"].nunique() > 1:
             recs.append({"Dataset": d, "Model": m, "det": DSD_PRINT_LUT.get(det, det),
-                         "rho": spearmanr(pf["stat"], pf["gap"])[0]})
+                         "rho": -spearmanr(pf["stat"], pf["gap"])[0]})  # rho(DR, accuracy)
     r = pd.DataFrame(recs).dropna()
     r.to_csv(f"{FIG}/signed_rho_dr95.csv", index=False)
     fig, ax = plt.subplots(figsize=(6.5, 2.4))
@@ -235,10 +267,10 @@ def fig_signed_rho(t):
     ax.axhline(0, color=MUTED, lw=0.8)
     ax.set_xticks(range(len(DATASETS_ALL)))
     ax.set_xticklabels([DS_TEX[d] for d in DATASETS_ALL])
-    ax.set_ylabel("Spearman ρ (DR vs. Δ)")
+    ax.set_ylabel("Spearman ρ (DR vs. accuracy)")
     ax.set_ylim(-1.05, 1.05)
     _grid(ax, "y")
-    ax.legend(frameon=False, fontsize=6.5, ncol=3, loc="lower left")
+    ax.legend(frameon=False, fontsize=6.5, ncol=3, loc="lower center", bbox_to_anchor=(0.5, 1.0))
     fig.tight_layout()
     _save(fig, "signed_rho")
     return r
@@ -249,7 +281,7 @@ def fig_intensity_breakdown(rows):
     methods = ["Ours-dr95 (nested sel.)", "NuclearNorm", "LabelShiftL1", "ATC-MC", "MDE"]
     rows = rows[rows["Dataset"].isin(CLASSIFICATION) & rows["Method"].isin(methods)].copy()
     rows["intensity"] = rows["fold"].map(_intensity)
-    fig, axes = plt.subplots(1, len(CLASSIFICATION), figsize=(12.5, 2.3), sharey=True)
+    fig, axes, first_col = _facets(len(CLASSIFICATION), panel_w=2.3, panel_h=1.9, sharey=True)
     for ax, ds in zip(axes, CLASSIFICATION):
         g = rows[rows["Dataset"] == ds]
         for k, m in enumerate(methods):
@@ -270,32 +302,37 @@ def fig_intensity_breakdown(rows):
         ax.set_title(DS_TEX[ds], fontsize=8)
         ax.set_xlabel("Synthetic intensity α")
         _grid(ax)
-    axes[0].set_ylabel("MAE")
+    for ax, fc in zip(axes, first_col):
+        if fc:
+            ax.set_ylabel("MAE")
     axes[0].set_ylim(0, 0.6)
-    axes[-1].legend(frameon=False, fontsize=6.5, loc="upper left", bbox_to_anchor=(1.0, 1.0))
+    h, l = axes[0].get_legend_handles_labels()
+    fig.legend(h, l, frameon=False, fontsize=7, ncol=len(methods), loc="lower center", bbox_to_anchor=(0.5, 1.0))
     fig.tight_layout()
     _save(fig, "intensity_breakdown")
 
 
-def fig_error_per_gap(rows):
+def fig_error_per_acc(rows):
     _style()
-    ours = rows[rows["Method"] == "Ours-dr95 (nested sel.)"]
-    fig, axes = plt.subplots(1, len(DATASETS_ALL), figsize=(12.5, 2.2), sharey=True)
+    ours = with_accuracy(rows[rows["Method"] == "Ours-dr95 (nested sel.)"])
+    fig, axes, first_col = _facets(len(DATASETS_ALL), panel_w=1.9, panel_h=1.8, sharey=True)
     for ax, ds in zip(axes, DATASETS_ALL):
-        g = ours[ours["Dataset"] == ds].sort_values("observed_gap")
-        ax.scatter(g["observed_gap"], g["MAE"], s=4, color="#2a78d6", alpha=0.35, lw=0)
+        g = ours[ours["Dataset"] == ds].sort_values("observed_acc")
+        ax.scatter(g["observed_acc"], g["MAE"], s=4, color="#2a78d6", alpha=0.35, lw=0)
         roll = g["MAE"].rolling(25, center=True, min_periods=5).mean()
-        ax.plot(g["observed_gap"], roll, color=TEXT, lw=1.2, label="running mean")
-        xs = np.linspace(0, max(g["observed_gap"].max(), 0.05), 50)
-        ax.plot(xs, np.abs(xs), color=MUTED, lw=0.9, ls="--", label="naive (no shift)")
+        ax.plot(g["observed_acc"], roll, color=TEXT, lw=1.2, label="running mean")
+        naive = g["observed_gap"].abs().rolling(25, center=True, min_periods=5).mean()
+        ax.plot(g["observed_acc"], naive, color=MUTED, lw=0.9, ls="--", label="naive (InD accuracy)")
         ax.set_title(DS_TEX[ds], fontsize=8)
-        ax.set_xlabel("Observed gap Δ")
+        ax.set_xlabel("Observed accuracy")
         _grid(ax)
-    axes[0].set_ylabel("Absolute error")
+    for ax, fc in zip(axes, first_col):
+        if fc:
+            ax.set_ylabel("Absolute error")
     axes[0].set_ylim(0, 0.5)
     axes[0].legend(frameon=False, fontsize=6.5, loc="upper left")
     fig.tight_layout()
-    _save(fig, "error_per_gap")
+    _save(fig, "error_per_acc")
 
 
 def seq_length(t, lengths=(4, 8, 16, 32, 64, 128, 256, 512), n_seq=30, seed=0):
@@ -315,10 +352,11 @@ def seq_length(t, lengths=(4, 8, 16, 32, 64, 128, 256, 512), n_seq=30, seed=0):
             def verdicts(det):
                 if det not in cache:
                     raw = load_data(ds, det, samples=1, model=m, shift="")
+                    if raw.empty:  # incomplete collection (see utils.load_data)
+                        cache[det] = (None, None)
+                        return cache[det]
                     raw = raw[raw["feature_name"] == FEATURE_COLUMN_ALIAS.get(det, det)]
-                    ind, ood = raw[~raw["ood"]], raw[raw["ood"]]
-                    hi = ood["feature"].mean() > ind["feature"].mean()
-                    thr = ind["feature"].quantile(0.95 if hi else 0.05)
+                    hi, thr = dr_calibration(raw, 0.95)
                     v = (raw["feature"] > thr) if hi else (raw["feature"] < thr)
                     iv = raw[raw["fold"] == "ind_val"]["correct_prediction"].mean()
                     cache[det] = (raw.assign(v=v.astype(float)), iv)
@@ -336,6 +374,8 @@ def seq_length(t, lengths=(4, 8, 16, 32, 64, 128, 256, 512), n_seq=30, seed=0):
                     tr = pools[det][pools[det]["shift_type"] != held]
                 reg = LinearRegression().fit(tr[["stat"]].values, tr["gap"].values)
                 raw, ind_acc = verdicts(det)
+                if raw is None:
+                    continue
                 if held is None:
                     folds = [f for f in raw["fold"].unique() if f not in ("train", "ind_val", "ind_test")
                              and f.split("_")[0] not in fams]
@@ -346,8 +386,8 @@ def seq_length(t, lengths=(4, 8, 16, 32, 64, 128, 256, 512), n_seq=30, seed=0):
                     v, c = g["v"].to_numpy(), g["correct_prediction"].to_numpy(float)
                     for n in lengths:
                         idx = rng.integers(0, len(v), size=(n_seq, n))
-                        pred = reg.predict(v[idx].mean(1).reshape(-1, 1))
-                        err = np.abs(pred - (ind_acc - c[idx].mean(1)))
+                        pred = np.clip(ind_acc - reg.predict(v[idx].mean(1).reshape(-1, 1)), 0.0, 1.0)
+                        err = np.abs(pred - c[idx].mean(1))
                         out.append({"Dataset": ds, "Model": m, "fold": f, "n": n,
                                     "category": "Organic" if held is None else "Synthetic",
                                     "MAE": err.mean(), "MAE_sd": err.std()})
@@ -399,24 +439,26 @@ def fig_cd_methods():
 def fig_calibration(rows):
     _style()
     methods = ["Ours-dr95 (nested sel.)", "NuclearNorm", "LabelShiftL1", "Reg-ATC", "ATC-MC", "MDE"]
-    rows = rows[rows["Dataset"].isin(CLASSIFICATION)]
-    fig, axes = plt.subplots(1, len(methods), figsize=(12.5, 2.3), sharex=True, sharey=True)
-    lim = (-0.15, 1.0)
+    rows = with_accuracy(rows[rows["Dataset"].isin(CLASSIFICATION)])
+    fig, axes, first_col = _facets(len(methods), panel_w=2.1, panel_h=2.1, sharex=True, sharey=True)
+    lim = (0.0, 1.02)
     for ax, m in zip(axes, methods):
         g = rows[rows["Method"] == m]
         syn, org = g[g["category"] == "Synthetic"], g[g["category"] == "Organic"]
-        ax.scatter(syn["observed_gap"], syn["predicted_gap"], s=3, color="#9a9890", alpha=0.35, lw=0,
+        ax.scatter(syn["observed_acc"], syn["predicted_acc"], s=3, color="#9a9890", alpha=0.35, lw=0,
                    label="synthetic")
-        ax.scatter(org["observed_gap"], org["predicted_gap"], s=16, marker="D", color="#2a78d6",
+        ax.scatter(org["observed_acc"], org["predicted_acc"], s=16, marker="D", color="#2a78d6",
                    edgecolor="white", lw=0.5, label="natural", zorder=3)
         ax.plot(lim, lim, color=TEXT, lw=0.8, ls="--")
         met = _calib_metrics(g)
         ax.set_title(f"{METHOD_PLAIN[m]}\nslope {met['slope']:.2f}, bias {met['bias']:+.3f}", fontsize=7.5)
         ax.set_xlim(lim)
         ax.set_ylim(lim)
-        ax.set_xlabel("Observed Δ")
+        ax.set_xlabel("Observed accuracy")
         _grid(ax)
-    axes[0].set_ylabel("Predicted Δ")
+    for ax, fc in zip(axes, first_col):
+        if fc:
+            ax.set_ylabel("Predicted accuracy")
     axes[0].legend(frameon=False, fontsize=6.5, loc="upper left")
     fig.tight_layout()
     _save(fig, "calibration")
@@ -429,13 +471,13 @@ def run():
     piv = table_mae_per_dataset(rows)
     print(piv.round(3).to_string())
     table_pairwise()
-    fig_dr_vs_gap(t)
+    fig_dr_vs_acc(t)
     r = fig_signed_rho(t)
     print("signed rho: median per dataset", r.groupby("Dataset")["rho"].median().round(2).to_dict(),
-          "share negative", round((r["rho"] < 0).mean(), 3), "n", len(r))
-    print("negative by detector:", r[r["rho"] < 0]["det"].value_counts().to_dict())
+          "share wrong-sign (positive)", round((r["rho"] > 0).mean(), 3), "n", len(r))
+    print("wrong-sign by detector:", r[r["rho"] > 0]["det"].value_counts().to_dict())
     fig_intensity_breakdown(rows)
-    fig_error_per_gap(rows)
+    fig_error_per_acc(rows)
     fig_cd_methods()
     fig_calibration(rows)
     s = seq_length(t)

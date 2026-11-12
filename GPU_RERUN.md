@@ -86,6 +86,26 @@ Also worth checking once on the GPU machine: that the new `grad_magnitude` match
 
 `features.grad_magnitude` falls back to `_grad_magnitude_loop` for the segmentation models, which takes `log_softmax` over the output channels. Binary segmentation has a single channel, so the log-softmax is identically 0 and every score is 0 (all `data/*/feature_data/Polyp_*_grad_magnitude.csv` from 2026-11-11 are constant). GradNorm therefore drops out of every Polyp analysis. Fix: for single-channel outputs use the sigmoid analogue (binary cross-entropy of the per-pixel probability against a 0.5 target), then recollect GradNorm for Polyp only.
 
+## 0f. MaNo and Dispersion (new baselines; rerun the softmax collection)
+
+`collect_softmax_stats.py` now also saves the **logits** (needed by MaNo, Xie et al. NeurIPS 2024) and the **classifier-head input features** (needed by the Dispersion score, Xie et al. NeurIPS 2023), and computes both statistics per fold and per 100-sample subset.
+
+**Sync first:** `collect_softmax_stats.py`, `uae_stats.py` (new `mano`, `dispersion`, `projection_matrix`), `features.py`.
+
+**Run** (all classification datasets; NICO again after its retrain):
+```bash
+python collect_softmax_stats.py
+python -c "import collect_softmax_stats as c; c.collect(datasets=['NICO'])"
+```
+The CSVs are now merged per (dataset, model), so a NICO-only run no longer wipes the other datasets.
+
+**Outputs to copy back:**
+- `data/softmax/<model>/<dataset>/*.npz`: now with `z` (logits) besides `p`, `y`, `idx`.
+- `data/features/<model>/<dataset>/*.npz` (new): head-input features, seeded Gaussian random projection to 256 dimensions, float16; about 1 MB per fold, roughly 2 GB in total. Used only by the offline label-shift test, which re-batches samples.
+- `figures/softmax_stats.csv` and `figures/softmax_stats_subsets.csv`: new columns `mano`, `mano_softmax`, `mano_taylor`, `dispersion` (exact, full features) and `dispersion_proj` (the same on the projected features, to check the approximation). **Copy these back**; do not regenerate them on the Mac with `recompute_softmax_stats.py`, which only has the projected features (it now refuses to overwrite a CSV with exact Dispersion).
+
+Check after copying: `corr(dispersion, dispersion_proj)` across folds should be close to 1.
+
 ## 1. Retrain NICO (required)
 
 **What was wrong:**

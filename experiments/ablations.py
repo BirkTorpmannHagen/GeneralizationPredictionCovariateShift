@@ -102,6 +102,21 @@ def _regressor_factories():
     }
 
 
+def clip_predicted_gap(pred_gap, ind_acc):
+    """Clip the implied accuracy estimate (ind_acc - predicted gap) to [0, 1]. Applied to every
+    method, since an accuracy outside [0, 1] carries no information a monitor could use."""
+    if ind_acc is None or not np.isfinite(ind_acc):
+        return pred_gap
+    return ind_acc - np.clip(ind_acc - np.asarray(pred_gap, dtype=float), 0.0, 1.0)
+
+
+def ind_acc_of(perfold):
+    """InD-val accuracy of a per-fold table (gap = ind_acc - Accuracy), or None without Accuracy."""
+    if perfold is None or "Accuracy" not in perfold.columns or perfold.empty:
+        return None
+    return float((perfold["Accuracy"] + perfold["gap"]).median())
+
+
 def _loso_from_perfold(perfold, dataset, model, feature_name, method, regressor=None):
     """
     Leave-one-shift-family-out regression on a per-fold table.
@@ -120,8 +135,10 @@ def _loso_from_perfold(perfold, dataset, model, feature_name, method, regressor=
     ]
     if len(pool) < 2:
         return rows
+    ind_acc = ind_acc_of(perfold)
 
     def emit(r, pred, st, cat):
+        pred = float(clip_predicted_gap(pred, ind_acc))
         rows.append({
             "Dataset": dataset,
             "Model": model,
@@ -221,25 +238,51 @@ def _perfold_stat(raw, dataset, model, feature_file, agg, performance_col=None):
     return out
 
 
+# A-priori orientation of each stored detector score (does a larger value mean more OOD?),
+# fixed by the detector's definition rather than estimated from data:
+#   distances / residual scores (kNN, Mahalanobis, ViM) and predictive entropy: higher = OOD;
+#   confidence-type scores (MSP, energy and ReAct stored as logsumexp of the logits,
+#   GradNorm, Uniform-CE = loss against an all-ones target, large for peaked predictions):
+#   higher = in-distribution.
+HIGHER_IS_OOD = {"knn": True, "mahalanobis": True, "vim": True, "entropy": True,
+                 "softmax": False, "msp": False, "energy": False, "react": False,
+                 "grad_magnitude": False, "cross_entropy": False}
+# Which in-distribution folds set the detection threshold (their q-quantile). No labels are used.
+THRESHOLD_FOLDS = ("ind_val",)
+
+
+def dr_calibration(sub, q=0.95, col="feature", threshold_folds=None):
+    """Orientation and threshold of the detection rate.
+
+    * orientation: a priori, from HIGHER_IS_OOD (no data involved);
+    * threshold: the q-quantile (or 1-q) of the scores on ``threshold_folds``.
+    Returns (higher_is_ood, threshold) or None if the threshold folds are missing.
+    """
+    folds = THRESHOLD_FOLDS if threshold_folds is None else threshold_folds
+    ref = sub[sub["fold"].isin(folds)][col]
+    if ref.empty:
+        return None
+    name = sub["feature_name"].iloc[0] if "feature_name" in sub.columns else None
+    if name not in HIGHER_IS_OOD:
+        raise KeyError(f"no a-priori orientation for detector {name!r}; add it to HIGHER_IS_OOD")
+    higher_is_ood = HIGHER_IS_OOD[name]
+    thr = float(ref.quantile(q)) if higher_is_ood else float(ref.quantile(1.0 - q))
+    return higher_is_ood, thr
+
+
 def _perfold_dr(raw, dataset, model, feature_file, q, performance_col=None):
     """
     Per-fold OOD detection rate at InD quantile ``q`` (id_quantile thresholding),
-    recomputed from raw per-sample scores. Replicates OODDetector(id_quantile).
-    Direction (higher_is_ood) is inferred from InD vs. all-OOD means.
+    recomputed from raw per-sample scores. Threshold and orientation come from
+    calibration data only (see dr_calibration).
     """
     sub = _get_sub(raw, dataset, model, feature_file)
     if sub is None or sub.empty:
         return None
-    ind = sub[~sub["ood"]]
-    ood = sub[sub["ood"]]
-    if ind.empty or ood.empty:
+    cal = dr_calibration(sub, q)
+    if cal is None:
         return None
-    higher_is_ood = ood["feature"].mean() > ind["feature"].mean()
-    thr = (
-        float(ind["feature"].quantile(q))
-        if higher_is_ood
-        else float(ind["feature"].quantile(1.0 - q))
-    )
+    higher_is_ood, thr = cal
 
     def dr(fdf):
         v = fdf["feature"].values
@@ -530,7 +573,7 @@ def label_free_baselines(batch_size=1, datasets=None):
                 rows.append({**base, "Method": "AC",
                              "predicted_gap": ind_acc - conf, "MAE": abs(conf - true_acc)})
                 # DoC: predicted acc = ind_acc - (ind_conf - conf)
-                doc = ind_acc - (ind_conf - conf)
+                doc = float(np.clip(ind_acc - (ind_conf - conf), 0.0, 1.0))
                 rows.append({**base, "Method": "DoC",
                              "predicted_gap": ind_acc - doc, "MAE": abs(doc - true_acc)})
     return pd.DataFrame(rows)
@@ -556,11 +599,16 @@ def _softmax_stat_predictions(path):
             lambda st: "Synthetic" if _is_synthetic_shift_type(st) else "Organic")
         ev["gap"] = ind_acc - ev["true_acc"]
         # Equal-resource versions: every statistic gets the same LOSO linear calibration.
+        # Exact Dispersion comes from the GPU collector; fall back to the projected-feature version.
+        if "dispersion" not in ev.columns and "dispersion_proj" in ev.columns:
+            ev["dispersion"] = ev["dispersion_proj"]
         for method, col in [("NuclearNorm", "nuclear_norm"), ("COT", "cot_err"),
-                            ("LabelShiftL1", "label_shift_l1")]:
+                            ("LabelShiftL1", "label_shift_l1"), ("MaNo", "mano"),
+                            ("Dispersion", "dispersion")]:
             if col not in ev.columns or ev[col].isna().all():
                 continue
-            pf = ev.rename(columns={col: "stat"})[["fold", "shift_type", "category", "stat", "gap"]].dropna()
+            pf = ev.rename(columns={col: "stat", "true_acc": "Accuracy"})[
+                ["fold", "shift_type", "category", "stat", "gap", "Accuracy"]].dropna()
             rows += _loso_from_perfold(pf, ds, m, "softmax", method)
         # Native COT (as published): predicted accuracy = 1 - transport cost, no calibration.
         if "cot_err" in ev.columns and ev["cot_err"].notna().any():

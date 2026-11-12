@@ -271,6 +271,7 @@ def get_all_pre_data():
     for model, dataset in itertools.product(MODELS, DATASETS):
         try:
             df = pd.read_csv(f"{prefix}/{model}/pra_data/{dataset}_pre_results.csv")
+            df = drop_invalid_folds(df, dataset, fold_col="test_set")
             df["Dataset"] = dataset
             all_data.append(df)
         except FileNotFoundError:
@@ -1729,6 +1730,8 @@ def pre_predictions():
             "category": category,
             "observed_gap": observed_gap,
             "predicted_gap": float(r["ind_acc"]) - float(r["E[f(x)=y]"]),
+            "observed_acc": float(r["Accuracy"]),
+            "predicted_acc": float(r["E[f(x)=y]"]),
             "MAE": abs(float(r["E[f(x)=y]"]) - float(r["Accuracy"])),
             "Method": "PRE",
         })

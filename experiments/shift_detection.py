@@ -129,8 +129,11 @@ def detection_rows(datasets=CLASSIFICATION, models=CLASSIFIERS, softmax_subsets=
     if os.path.exists(softmax_subsets):
         s = pd.read_csv(softmax_subsets)
         for (ds, model), g in s.groupby(["Dataset", "Model"]):
-            for method, col in [("NuclearNorm", "nuclear_norm"), ("COT", "cot_err")]:
-                if col in g.columns:
+            if "dispersion" not in g.columns and "dispersion_proj" in g.columns:
+                g = g.assign(dispersion=g["dispersion_proj"])
+            for method, col in [("NuclearNorm", "nuclear_norm"), ("COT", "cot_err"), ("MaNo", "mano"),
+                                ("Dispersion", "dispersion")]:
+                if col in g.columns and g[col].notna().any():
                     b = {f: gg[col].to_numpy() for f, gg in g.groupby("fold")}
                     rows += _score_folds(ds, model, method, b)
     else:

@@ -51,6 +51,8 @@ from experiments.accuracy_prediction import _atc_threshold, atc_predictions
 from experiments.ablations import (
     _loso_from_perfold,
     _perfold_dr,
+    clip_predicted_gap,
+    ind_acc_of,
     _perfold_stat,
     _softmax_stat_predictions,
     label_free_baselines,
@@ -60,8 +62,15 @@ from utils import DSD_PRINT_LUT, DSDS, FEATURE_COLUMN_ALIAS, load_data
 
 FIGDIR = "figures"
 CLASSIFICATION = ["CCT", "OfficeHome", "Office31", "NICO", "Camelyon17", "IWildCam"]
+# Temporary exclusion for previews on a partially synced data folder, e.g.
+#   UAE_EXCLUDE_DATASETS=Camelyon17 python -m experiments.ranking_analysis
+_EXCLUDED = {d for d in os.environ.get("UAE_EXCLUDE_DATASETS", "").split(",") if d}
+if _EXCLUDED:
+    print(f"[ranking_analysis] PREVIEW: excluding {sorted(_EXCLUDED)}")
+    CLASSIFICATION = [d for d in CLASSIFICATION if d not in _EXCLUDED]
 CLASSIFIERS = ["resnet", "vit"]
 SEGMENTORS = ["deeplabv3plus", "unet", "segformer"]
+OURS = "Ours-dr95 (nested sel.)"  # control method for the pairwise tests
 AGGREGATES = {
     "mean": lambda f: float(f["feature"].mean()),
     "dr95": None,  # detection rate at the 0.95 InD quantile, via _perfold_dr
@@ -112,7 +121,7 @@ def _perfold_tables(datasets, models, detectors=DSDS):
             else:
                 pf = _perfold_stat(idx, ds, m, col, fn)
             if pf is not None and not pf.empty:
-                tables[(ds, m, det, agg)] = pf[["fold", "shift_type", "category", "stat", "gap"]]
+                tables[(ds, m, det, agg)] = pf[["fold", "shift_type", "category", "stat", "gap", "Accuracy"]]
         del raw, idx
     return tables
 
@@ -147,8 +156,10 @@ def _nested_selection_rows(tables, agg):
         cands = {d: pf for (ds2, m2, d, a), pf in tables.items() if (ds2, m2, a) == (ds, m, agg)}
         pools = {d: pf[(pf["category"] == "Synthetic") & (pf["shift_type"] != "ind")] for d, pf in cands.items()}
         families = sorted(set.intersection(*[set(p["shift_type"]) for p in pools.values()]))
+        ind_acc = ind_acc_of(next(iter(cands.values())))  # InD-val accuracy, same for every detector
 
         def emit(r, pred, det, st, cat):
+            pred = float(clip_predicted_gap(pred, ind_acc))
             rows.append({
                 "Dataset": ds, "Model": m, "feature_name": DSD_PRINT_LUT.get(det, det),
                 "fold": r["fold"], "shift_type": st, "category": cat,
@@ -259,8 +270,14 @@ def nemenyi_cd(k, N, alpha=0.05):
     return float(q * np.sqrt(k * (k + 1) / (6.0 * N)))
 
 
-def wilcoxon_holm(scores, alpha=0.05):
-    """Pairwise two-sided Wilcoxon signed-rank on block scores, Holm-corrected."""
+def wilcoxon_holm(scores, alpha=0.05, control=None):
+    """Pairwise two-sided Wilcoxon signed-rank on block scores, Holm-corrected.
+
+    ``p_holm`` corrects over all pairs (used for the CD-diagram cliques). If ``control`` is
+    given, ``p_holm_control`` corrects only over the k-1 comparisons against that method, the
+    design Demsar (2006) recommends for comparing a proposed method with each baseline; it is
+    NaN for pairs not involving the control.
+    """
     rows = []
     for a, b in itertools.combinations(scores.columns, 2):
         x, y = scores[a].values, scores[b].values
@@ -275,6 +292,13 @@ def wilcoxon_holm(scores, alpha=0.05):
     adj = np.maximum.accumulate([min(1.0, (m - i) * p) for i, p in enumerate(out["p_value"])])
     out["p_holm"] = adj
     out["significant"] = out["p_holm"] < alpha
+    out["p_holm_control"] = np.nan
+    if control is not None and control in scores.columns:
+        mask = (out["method_1"] == control) | (out["method_2"] == control)
+        sub = out[mask].sort_values("p_value")
+        k = len(sub)
+        adj_c = np.maximum.accumulate([min(1.0, (k - i) * p) for i, p in enumerate(sub["p_value"])])
+        out.loc[sub.index, "p_holm_control"] = adj_c
     return out
 
 
@@ -324,7 +348,8 @@ def cd_diagram(avg_ranks, cd, pairwise, title, path):
 FINE_BLOCK = ("Dataset", "Model", "shift_type")
 
 
-def analyse(rows, label, scopes=SCOPES, alpha=0.05, block=("Dataset", "Model"), max_intensity_only=False):
+def analyse(rows, label, scopes=SCOPES, alpha=0.05, block=("Dataset", "Model"), max_intensity_only=False,
+            control=None):
     """Run the full ranking analysis on a long-format row table; write CSVs and CD diagrams.
 
     ``block=FINE_BLOCK`` treats each (dataset, model, shift family) as a block — the unit
@@ -347,7 +372,7 @@ def analyse(rows, label, scopes=SCOPES, alpha=0.05, block=("Dataset", "Model"), 
         fr = friedman_tests(scores)
         cd = nemenyi_cd(scores.shape[1], scores.shape[0], alpha)
         fr.update({"analysis": label, "scope": scope, "nemenyi_CD": cd})
-        pw = wilcoxon_holm(scores, alpha)
+        pw = wilcoxon_holm(scores, alpha, control=control)
 
         tag = f"{label}_{scope.lower()}"
         scores.round(4).to_csv(f"{FIGDIR}/ranking_{tag}_block_scores.csv")
@@ -411,8 +436,8 @@ def method_ranking(tables=None):
         frames.append(_softmax_stat_predictions(nn_path))
     rows = pd.concat([f for f in frames if f is not None and not f.empty], ignore_index=True)
     rows = rows[rows["Dataset"].isin(CLASSIFICATION)]
-    analyse(rows, "methods")
-    analyse(rows, "methods", scopes=("All",), block=FINE_BLOCK)
+    analyse(rows, "methods", control=OURS)
+    analyse(rows, "methods", scopes=("All",), block=FINE_BLOCK, control=OURS)
     return rows
 
 
